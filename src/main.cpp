@@ -73,6 +73,8 @@ struct Config {
   float calibrationOffset = 0.0;
   float calibrationScale = 1.0;
   String timezone = "UTC";
+  float lastMeasurementValue = 0.0;
+  unsigned long lastMeasurementTime = 0; // Unix timestamp
 } config;
 
 // Global variables
@@ -89,6 +91,8 @@ unsigned long lastMeasurementMillis = 0;
 void initializeSystem();
 void loadConfig();
 void saveConfig();
+void createDefaultConfig();
+void calculateNextMeasurementTime();
 void setupWiFiHotspot();
 void setupWebServer();
 void handleWebRequests();
@@ -110,9 +114,11 @@ String getFileList();
 bool deleteFile(String filename);
 String getFileInfo(String filename);
 
+bool rtcAvailable = false;
+
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting Claybath Density Measurement System...");
   
   // Initialize pins
   pinMode(FILL_SOLENOID_PIN, OUTPUT);
@@ -130,14 +136,11 @@ void setup() {
   I2C_1.setClock(100000); // Set I2C clock to 100kHz for stability
   I2C_2.setClock(100000); // Set I2C clock to 100kHz for stability
   
-  // Small delay to allow I2C buses to stabilize
-  delay(500);
-  
-  // Scan I2C devices for debugging
-  scanI2CDevices();
-  
-  // Initialize system
+  // Initialize system first (this will initialize RTC)
   initializeSystem();
+  
+  // Now scan I2C devices after RTC is initialized
+  scanI2CDevices();
   
   // Setup WiFi hotspot
   setupWiFiHotspot();
@@ -145,38 +148,23 @@ void setup() {
   // Setup web server
   setupWebServer();
   
-  // Now we can use logSerial safely
   logSerial("Claybath density measurement system initialized");
 }
 
 // Enhanced logSerial function for web interface
 void logSerial(String message) {
-  String timestamp = "";
-  
-  // Only try to get RTC time if it's been initialized and working
-  if (checkRTCConnection()) {
+  String timestamp;
+  if (rtcAvailable) {
     DateTime now = rtc.now();
-    timestamp = String(now.hour()) + ":" + 
-               String(now.minute()) + ":" + 
-               String(now.second());
+    timestamp = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second());
   } else {
-    // Use millis() as fallback timestamp
-    unsigned long ms = millis();
-    unsigned long seconds = ms / 1000;
-    unsigned long minutes = seconds / 60;
-    unsigned long hours = minutes / 60;
-    timestamp = String(hours % 24) + ":" + 
-               String(minutes % 60) + ":" + 
-               String(seconds % 60);
+    timestamp = "??:??:??";
   }
-  
+
   String logMessage = "[" + timestamp + "] " + message;
   Serial.println(logMessage);
-  
-  // Add to web serial buffer
+
   serialBuffer += logMessage + "\n";
-  
-  // Trim buffer if too long
   if (serialBuffer.length() > MAX_SERIAL_BUFFER) {
     int newlinePos = serialBuffer.indexOf('\n', serialBuffer.length() - MAX_SERIAL_BUFFER);
     if (newlinePos != -1) {
@@ -184,6 +172,7 @@ void logSerial(String message) {
     }
   }
 }
+
 
 // Updated main loop
 void loop() {
@@ -195,9 +184,10 @@ void loop() {
   
   // Check if it's time for automatic measurement
   if (measurementState == IDLE && !isManualMode && 
-      millis() - lastMeasurementMillis >= (config.measurementInterval * 3600000)) {
+      nextMeasurementTime.unixtime() > 0 && 
+      rtc.now().unixtime() >= nextMeasurementTime.unixtime()) {
+    logSerial("Automatic measurement triggered");
     performMeasurement();
-    lastMeasurementMillis = millis();
   }
   
   // Update displays
@@ -213,7 +203,7 @@ void loop() {
 void initializeSystem() {
   // Initialize LittleFS
   if (!LittleFS.begin()) {
-    Serial.println("LittleFS initialization failed!");
+    logSerial("LittleFS initialization failed!");
     return;
   }
   
@@ -222,42 +212,34 @@ void initializeSystem() {
   
   // Initialize DS3231 RTC on I2C Bus 2
   if (!rtc.begin(&I2C_2)) {
-    Serial.println("Couldn't find DS3231 RTC on I2C Bus 2");
-    // Continue without RTC but log error
+    logSerial("Couldn't find DS3231 RTC on I2C Bus 2");
+    rtcAvailable = false;
   } else {
-    Serial.println("DS3231 RTC initialized successfully on I2C Bus 2");
+    rtcAvailable = true;
+    logSerial("DS3231 RTC initialized successfully on I2C Bus 2");
     
     // Check if RTC lost power and if so, set the time
     if (rtc.lostPower()) {
-      Serial.println("RTC lost power, setting time to compile time");
+      logSerial("RTC lost power, setting time to compile time");
       // Set to compile time as fallback
       rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
     
     // Print current time
     DateTime now = rtc.now();
-    Serial.print("Current RTC time: ");
-    Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(" ");
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.println(now.second(), DEC);
+    logSerial("Current RTC time: " + String(now.year()) + "/" + 
+              String(now.month()) + "/" + String(now.day()) + " " + 
+              String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()));
   }
   
   // Initialize MPU6050 on I2C Bus 1
   if (!mpu.begin(MPU6050_ADDRESS, &I2C_1)) {
-    Serial.println("Failed to find MPU6050 chip on I2C Bus 1");
+    logSerial("Failed to find MPU6050 chip on I2C Bus 1");
     while (1) {
       delay(10);
     }
   }
-  Serial.println("MPU6050 initialized successfully on I2C Bus 1");
+  logSerial("MPU6050 initialized successfully on I2C Bus 1");
   
   // Configure MPU6050
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
@@ -269,15 +251,15 @@ void initializeSystem() {
   
   // Initialize displays on separate I2C buses
   if (!display1.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed for display 1"));
+    logSerial("SSD1306 allocation failed for display 1");
   } else {
-    Serial.println("OLED Display 1 initialized successfully on I2C_1");
+    logSerial("OLED Display 1 initialized successfully on I2C_1");
   }
   
   if (!display2.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed for display 2"));
+    logSerial("SSD1306 allocation failed for display 2");
   } else {
-    Serial.println("OLED Display 2 initialized successfully on I2C_2");
+    logSerial("OLED Display 2 initialized successfully on I2C_2");
   }
   
   display1.clearDisplay();
@@ -304,13 +286,36 @@ void initializeSystem() {
   
   delay(2000);
   
-  // Calculate next measurement time only if RTC is working
-  if (checkRTCConnection()) {
-    DateTime now = rtc.now();
-    nextMeasurementTime = DateTime(now.unixtime() + (config.measurementInterval * 3600));
-  }
+  // Calculate next measurement time based on last measurement
+  calculateNextMeasurementTime();
   
-  Serial.println("System initialization complete");
+  logSerial("System initialization complete");
+}
+
+void calculateNextMeasurementTime() {
+  DateTime now = rtc.now();
+  
+  if (config.lastMeasurementTime > 0) {
+    // If we have a last measurement, calculate next measurement time
+    DateTime lastMeasurement = DateTime(config.lastMeasurementTime);
+    
+    // Check if last measurement was today
+    if (lastMeasurement.day() == now.day() && 
+        lastMeasurement.month() == now.month() && 
+        lastMeasurement.year() == now.year()) {
+      // Last measurement was today, schedule next measurement
+      nextMeasurementTime = DateTime((uint32_t)(config.lastMeasurementTime + (config.measurementInterval * 3600)));
+      logSerial("Next measurement scheduled for: " + String(nextMeasurementTime.timestamp()));
+    } else {
+      // Last measurement was not today, no automatic measurement scheduled
+      nextMeasurementTime = DateTime((uint32_t)0); // Invalid time indicates no scheduled measurement
+      logSerial("No automatic measurement scheduled (last measurement was not today)");
+    }
+  } else {
+    // No previous measurement, no automatic measurement scheduled
+    nextMeasurementTime = DateTime((uint32_t)0); // Invalid time indicates no scheduled measurement
+    logSerial("No previous measurement found, no automatic measurement scheduled");
+  }
 }
 
 void loadConfig() {
@@ -318,7 +323,14 @@ void loadConfig() {
     File file = LittleFS.open("/settings.json", "r");
     if (file) {
       DynamicJsonDocument doc(1024);
-      deserializeJson(doc, file);
+      DeserializationError error = deserializeJson(doc, file);
+      
+      if (error) {
+        logSerial("Failed to parse settings.json, creating new one");
+        file.close();
+        createDefaultConfig();
+        return;
+      }
       
       config.desiredDensity = doc["desiredDensity"] | 1.025;
       config.measurementInterval = doc["measurementInterval"] | 2;
@@ -328,6 +340,8 @@ void loadConfig() {
       config.emptyDuration = doc["emptyDuration"] | 120;
       config.calibrationOffset = doc["calibrationOffset"] | 0.0;
       config.calibrationScale = doc["calibrationScale"] | 1.0;
+      config.lastMeasurementValue = doc["lastMeasurementValue"] | 0.0;
+      config.lastMeasurementTime = doc["lastMeasurementTime"] | 0;
       
       // Handle String assignment properly
       const char* timezoneStr = doc["timezone"] | "UTC";
@@ -335,8 +349,41 @@ void loadConfig() {
       
       file.close();
       logSerial("Configuration loaded from settings.json");
+      
+      // Update global variables from config
+      if (config.lastMeasurementTime > 0) {
+        lastMeasurement = config.lastMeasurementValue;
+        lastMeasurementTime = DateTime(config.lastMeasurementTime);
+        logSerial("Last measurement restored: " + String(lastMeasurement, 3) + 
+                 " at " + String(lastMeasurementTime.timestamp()));
+      }
+    } else {
+      logSerial("Failed to open settings.json, creating new one");
+      createDefaultConfig();
     }
+  } else {
+    logSerial("settings.json not found, creating default configuration");
+    createDefaultConfig();
   }
+}
+
+void createDefaultConfig() {
+  // Reset to default values
+  config.desiredDensity = 1.025;
+  config.measurementInterval = 2;
+  config.fillDuration = 5;
+  config.waitDuration = 60;
+  config.measurementDuration = 10;
+  config.emptyDuration = 120;
+  config.calibrationOffset = 0.0;
+  config.calibrationScale = 1.0;
+  config.timezone = "UTC";
+  config.lastMeasurementValue = 0.0;
+  config.lastMeasurementTime = 0;
+  
+  // Save the default configuration
+  saveConfig();
+  logSerial("Default configuration created and saved");
 }
 
 void saveConfig() {
@@ -350,12 +397,16 @@ void saveConfig() {
   doc["calibrationOffset"] = config.calibrationOffset;
   doc["calibrationScale"] = config.calibrationScale;
   doc["timezone"] = config.timezone;
+  doc["lastMeasurementValue"] = config.lastMeasurementValue;
+  doc["lastMeasurementTime"] = config.lastMeasurementTime;
   
   File file = LittleFS.open("/settings.json", "w");
   if (file) {
     serializeJson(doc, file);
     file.close();
     logSerial("Configuration saved to settings.json");
+  } else {
+    logSerial("Failed to save configuration to settings.json");
   }
 }
 
@@ -377,10 +428,11 @@ void setupWebServer() {
     doc["currentAngle"] = currentAngle;
     doc["currentDensity"] = currentDensity;
     doc["lastMeasurement"] = lastMeasurement;
-    doc["lastMeasurementTime"] = lastMeasurementTime.unixtime();
-    doc["nextMeasurementTime"] = nextMeasurementTime.unixtime();
+    doc["lastMeasurementTime"] = config.lastMeasurementTime;
+    doc["nextMeasurementTime"] = nextMeasurementTime.unixtime() > 0 ? nextMeasurementTime.unixtime() : 0;
     doc["isMeasuring"] = isMeasuring;
     doc["isManualMode"] = isManualMode;
+    doc["hasScheduledMeasurement"] = nextMeasurementTime.unixtime() > 0;
     
     String response;
     serializeJson(doc, response);
@@ -432,6 +484,8 @@ void setupWebServer() {
     doc["calibrationOffset"] = config.calibrationOffset;
     doc["calibrationScale"] = config.calibrationScale;
     doc["timezone"] = config.timezone;
+    doc["lastMeasurementValue"] = config.lastMeasurementValue;
+    doc["lastMeasurementTime"] = config.lastMeasurementTime;
     
     String response;
     serializeJson(doc, response);
@@ -707,6 +761,11 @@ void updateMeasurementState() {
             lastMeasurement = currentDensity;
             lastMeasurementTime = rtc.now();
             
+            // Update config with new measurement data
+            config.lastMeasurementValue = currentDensity;
+            config.lastMeasurementTime = lastMeasurementTime.unixtime();
+            saveConfig(); // Save the measurement data to settings
+            
             // Log measurement details
             logSerial("Measurement completed - Angle: " + String(currentAngle, 2) + 
                      "°, Density: " + String(currentDensity, 4) + 
@@ -732,15 +791,16 @@ void updateMeasurementState() {
       if (elapsedTime >= (config.emptyDuration * 1000)) {
         digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
         
-        // Calculate next measurement time
+        // Calculate next measurement time based on current measurement
         DateTime now = rtc.now();
-        nextMeasurementTime = DateTime(now.unixtime() + (config.measurementInterval * 3600));
+        nextMeasurementTime = DateTime((uint32_t)(now.unixtime() + (config.measurementInterval * 3600)));
         
         // Reset state
         measurementState = IDLE;
         isMeasuring = false;
         
         logSerial("Measurement sequence complete");
+        logSerial("Next measurement scheduled for: " + String(nextMeasurementTime.timestamp()));
       }
       break;
   }
@@ -771,15 +831,74 @@ void updateDisplays() {
   display1.printf("%.3f", config.desiredDensity);
   display1.setTextSize(1);
   display1.setCursor(0, 28);
-  display1.println("NEXT MEASUREMENT");
-  display1.setCursor(0, 36);
-  display1.printf("%02d:%02d %02d/%02d/%02d", 
-    nextMeasurementTime.hour(), 
-    nextMeasurementTime.minute(),
-    nextMeasurementTime.day(),
-    nextMeasurementTime.month(),
-    nextMeasurementTime.year() % 100);
+  
+  if (nextMeasurementTime.unixtime() > 0) {
+    display1.println("NEXT MEASUREMENT");
+    display1.setCursor(0, 36);
+    display1.printf("%02d:%02d %02d/%02d/%02d", 
+      nextMeasurementTime.hour(), 
+      nextMeasurementTime.minute(),
+      nextMeasurementTime.day(),
+      nextMeasurementTime.month(),
+      nextMeasurementTime.year() % 100);
+  } else {
+    display1.println("NO SCHEDULED");
+    display1.setCursor(0, 36);
+    display1.println("MEASUREMENT");
+  }
   display1.display();
+  
+  // Display 2: Last measurement and current time
+  display2.clearDisplay();
+  display2.setTextSize(1);
+  display2.setCursor(0, 0);
+  display2.println("LAST MEASUREMENT");
+  display2.setTextSize(2);
+  display2.setCursor(0, 12);
+  if (lastMeasurement > 0) {
+    display2.printf("%.3f", lastMeasurement);
+  } else {
+    display2.print("--");
+  }
+  display2.setTextSize(1);
+  display2.setCursor(0, 28);
+  display2.println("CURRENT TIME");
+  display2.setCursor(0, 36);
+  display2.printf("%02d:%02d:%02d %02d/%02d", 
+    now.hour(), 
+    now.minute(),
+    now.second(),
+    now.day(),
+    now.month());
+  
+  // Show detailed measurement status
+  display2.setCursor(0, 55);
+  if (isMeasuring) {
+    switch (measurementState) {
+      case EMPTYING_INITIAL:
+        display2.print("PREPARING...");
+        break;
+      case FILLING:
+        display2.print("FILLING...");
+        break;
+      case WAITING_TO_SETTLE:
+        display2.print("SETTLING...");
+        break;
+      case MEASURING:
+        display2.printf("MEASURING %d/%d", measurementCount, config.measurementDuration);
+        break;
+      case EMPTYING_FINAL:
+        display2.print("EMPTYING...");
+        break;
+      default:
+        display2.print("MEASURING...");
+    }
+  } else {
+    display2.print("READY");
+  }
+  
+  display2.display();
+
   
   // Display 2: Last measurement and current time
   display2.clearDisplay();
@@ -908,7 +1027,7 @@ float angleToDensity(float angle) {
 }
 
 void scanI2CDevices() {
-  Serial.println("Scanning I2C Bus 1 (GPIO21/22) - MPU6050 & OLED1...");
+  logSerial("Scanning I2C Bus 1 (GPIO21/22) - MPU6050 & OLED1...");
   int deviceCount1 = 0;
   
   for (byte address = 1; address < 127; address++) {
@@ -926,12 +1045,12 @@ void scanI2CDevices() {
       } else if (address == 0x3C) {
         deviceInfo += " (OLED Display 1)";
       }
-      Serial.println(deviceInfo);
+      logSerial(deviceInfo);
       deviceCount1++;
     }
   }
   
-  Serial.println("Scanning I2C Bus 2 (GPIO18/19) - DS3231 & OLED2...");
+  logSerial("Scanning I2C Bus 2 (GPIO18/19) - DS3231 & OLED2...");
   int deviceCount2 = 0;
   
   for (byte address = 1; address < 127; address++) {
@@ -949,15 +1068,13 @@ void scanI2CDevices() {
       } else if (address == 0x3C) {
         deviceInfo += " (OLED Display 2)";
       }
-      Serial.println(deviceInfo);
+      logSerial(deviceInfo);
       deviceCount2++;
     }
   }
   
-  Serial.print("Total devices found: Bus 1: ");
-  Serial.print(deviceCount1);
-  Serial.print(", Bus 2: ");
-  Serial.println(deviceCount2);
+  logSerial("Total devices found: Bus 1: " + String(deviceCount1) + 
+           ", Bus 2: " + String(deviceCount2));
 }
 
 bool checkRTCConnection() {

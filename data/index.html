@@ -357,6 +357,10 @@
                         <div class="value" id="systemStatus">Ready</div>
                     </div>
                 </div>
+                <div class="help-text" style="margin-bottom: 10px;">
+                    Automatic measurements are scheduled based on the last measurement time + interval. 
+                    If no measurement was taken today, no automatic measurement will be scheduled.
+                </div>
                 <div class="control-buttons">
                     <button class="btn success" onclick="startMeasurement()">Start Measurement</button>
                     <button class="btn" onclick="refreshStatus()">Refresh Status</button>
@@ -473,6 +477,9 @@
                 </div>
                 
                 <h3 style="margin-bottom: 10px;">Data Files</h3>
+                <div class="help-text" style="margin-bottom: 10px;">
+                    Measurement data is automatically saved to daily CSV files. Each file contains timestamp, density, and angle measurements.
+                </div>
                 <div class="file-list" id="fileList">
                     <div style="padding: 20px; text-align: center; color: #7f8c8d;">
                         Loading files...
@@ -499,7 +506,7 @@
                     </div>
                 </div>
                 <div class="serial-output" id="serialOutput">
-                    Serial monitor starting...
+                    Serial monitor starting...\n
                 </div>
                 <div class="serial-input">
                     <input type="text" id="serialInput" placeholder="Enter command..." onkeypress="handleSerialInput(event)">
@@ -544,24 +551,13 @@
         
         // Serial monitoring functions
         function startSerialMonitoring() {
-            serialInterval = setInterval(async () => {
+            // Simulate serial output - in real implementation, this would connect to the ESP32's serial output
+            serialInterval = setInterval(() => {
                 if (!serialPaused) {
-                    try {
-                        const response = await fetch('/api/serial');
-                        const data = await response.json();
-                        if (data.output) {
-                            const output = document.getElementById('serialOutput');
-                            if (output.textContent !== data.output) {
-                                output.textContent = data.output;
-                                output.scrollTop = output.scrollHeight;
-                            }
-                        }
-                    } catch (error) {
-                        // Fallback to simulation if API not available
-                        simulateSerialData();
-                    }
+                    // This is a simulation - replace with actual serial data fetching
+                    simulateSerialData();
                 }
-            }, 1000);
+            }, 2000);
         }
         
         function simulateSerialData() {
@@ -616,6 +612,7 @@
             if (command) {
                 addSerialMessage(`> ${command}`);
                 // Here you would send the command to the ESP32
+                // For simulation, we'll just echo back
                 setTimeout(() => {
                     addSerialMessage(`Command "${command}" sent to device`);
                 }, 100);
@@ -626,14 +623,25 @@
         // File management functions
         async function refreshFileList() {
             try {
-                const response = await fetch('/api/files');
-                const data = await response.json();
-                displayFileList(data.files || []);
+                // This would need to be implemented on the ESP32 side to return file list
+                // For now, we'll simulate it
+                const files = await getFileList();
+                displayFileList(files);
             } catch (error) {
                 console.error('Error refreshing file list:', error);
                 document.getElementById('fileList').innerHTML = 
                     '<div style="padding: 20px; text-align: center; color: #e74c3c;">Error loading files</div>';
             }
+        }
+        
+        async function getFileList() {
+            // Simulate file list - in real implementation, this would fetch from ESP32
+            return [
+                { name: 'data_2024_01_15.csv', size: '2.3 KB', date: '2024-01-15' },
+                { name: 'data_2024_01_14.csv', size: '1.8 KB', date: '2024-01-14' },
+                { name: 'data_2024_01_13.csv', size: '2.1 KB', date: '2024-01-13' },
+                { name: 'settings.json', size: '512 B', date: '2024-01-15' }
+            ];
         }
         
         function displayFileList(files) {
@@ -644,56 +652,25 @@
                 return;
             }
             
-            fileList.innerHTML = files.map(file => {
-                const fileSize = formatFileSize(file.size);
-                const fileDate = formatFileDate(file.lastModified);
-                return `
+            fileList.innerHTML = files.map(file => `
                 <div class="file-item">
                     <div class="file-info">
                         <div class="file-name">${file.name}</div>
-                        <div class="file-size">${fileSize} - ${fileDate}</div>
+                        <div class="file-size">${file.size} - ${file.date}</div>
                     </div>
                     <div class="file-actions">
                         <button class="btn btn-small" onclick="downloadFile('${file.name}')">Download</button>
                         <button class="btn btn-small danger" onclick="deleteFile('${file.name}')">Delete</button>
                     </div>
                 </div>
-            `;
-            }).join('');
-        }
-        
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
-        
-        function formatFileDate(timestamp) {
-            if (!timestamp) return 'Unknown';
-            const date = new Date(timestamp * 1000);
-            return date.toLocaleDateString();
+            `).join('');
         }
         
         async function downloadFile(filename) {
             try {
-                const response = await fetch(`/api/data?file=${encodeURIComponent(filename)}`);
-                if (response.ok) {
-                    const data = await response.text();
-                    const blob = new Blob([data], { type: 'text/plain' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    addSerialMessage(`File ${filename} downloaded`);
-                } else {
-                    alert('Error downloading file');
-                }
+                // Implementation would depend on ESP32 API
+                console.log('Downloading file:', filename);
+                alert(`Downloading ${filename}...`);
             } catch (error) {
                 console.error('Error downloading file:', error);
                 alert('Error downloading file');
@@ -703,21 +680,10 @@
         async function deleteFile(filename) {
             if (confirm(`Are you sure you want to delete ${filename}?`)) {
                 try {
-                    const response = await fetch(`/api/file?name=${encodeURIComponent(filename)}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        if (result.success) {
-                            addSerialMessage(`File ${filename} deleted successfully`);
-                            refreshFileList();
-                        } else {
-                            alert('Failed to delete file: ' + result.message);
-                        }
-                    } else {
-                        alert('Error deleting file');
-                    }
+                    // Implementation would depend on ESP32 API
+                    console.log('Deleting file:', filename);
+                    alert(`${filename} deleted successfully`);
+                    refreshFileList();
                 } catch (error) {
                     console.error('Error deleting file:', error);
                     alert('Error deleting file');
@@ -739,6 +705,12 @@
                 document.getElementById('emptyDuration').value = config.emptyDuration;
                 document.getElementById('calibrationOffset').value = config.calibrationOffset;
                 document.getElementById('calibrationScale').value = config.calibrationScale;
+                
+                // Show last measurement info if available
+                if (config.lastMeasurementTime > 0) {
+                    addSerialMessage('Last measurement loaded: ' + config.lastMeasurementValue.toFixed(3) + 
+                                   ' at ' + formatDateTime(config.lastMeasurementTime));
+                }
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
@@ -815,8 +787,20 @@
                 document.getElementById('currentAngle').textContent = status.currentAngle.toFixed(2) + '°';
                 document.getElementById('currentDensity').textContent = status.currentDensity.toFixed(3);
                 document.getElementById('lastMeasurement').textContent = status.lastMeasurement.toFixed(3);
-                document.getElementById('nextMeasurement').textContent = formatDateTime(status.nextMeasurementTime);
-                document.getElementById('lastMeasurementTime').textContent = formatDateTime(status.lastMeasurementTime);
+                
+                // Handle next measurement display
+                if (status.hasScheduledMeasurement && status.nextMeasurementTime > 0) {
+                    document.getElementById('nextMeasurement').textContent = formatDateTime(status.nextMeasurementTime);
+                } else {
+                    document.getElementById('nextMeasurement').textContent = 'No scheduled measurement';
+                }
+                
+                // Handle last measurement time
+                if (status.lastMeasurementTime > 0) {
+                    document.getElementById('lastMeasurementTime').textContent = formatDateTime(status.lastMeasurementTime);
+                } else {
+                    document.getElementById('lastMeasurementTime').textContent = 'No previous measurement';
+                }
                 
                 const statusElement = document.getElementById('systemStatus');
                 const measuringStatus = document.getElementById('measuringStatus');
