@@ -41,6 +41,23 @@ Adafruit_SSD1306 display2(SCREEN_WIDTH, SCREEN_HEIGHT, &I2C_2, OLED_RESET);
 RTC_DS3231 rtc;
 WebServer server(80);
 
+// Add these global variables for non-blocking measurement
+enum MeasurementState {
+  IDLE,
+  EMPTYING_INITIAL,
+  FILLING,
+  WAITING_TO_SETTLE,
+  MEASURING,
+  EMPTYING_FINAL
+};
+
+MeasurementState measurementState = IDLE;
+unsigned long stateStartTime = 0;
+float angleSum = 0.0;
+int validReadings = 0;
+int measurementCount = 0;
+unsigned long lastAngleReadTime = 0;
+
 // Configuration structure
 struct Config {
   float desiredDensity = 1.025;
@@ -83,6 +100,7 @@ void setDateTime(int year, int month, int day, int hour, int minute, int second)
 void scanI2CDevices();
 bool checkRTCConnection();
 bool checkMPUConnection();
+void updateMeasurementState();
 
 void setup() {
   Serial.begin(115200);
@@ -118,12 +136,17 @@ void setup() {
   Serial.println("Claybath density measurement system initialized");
 }
 
+// Updated main loop
 void loop() {
-  // Handle web server requests
+  // Handle web server requests (this will now work during measurement)
   server.handleClient();
   
+  // Update measurement state machine
+  updateMeasurementState();
+  
   // Check if it's time for automatic measurement
-  if (!isManualMode && millis() - lastMeasurementMillis >= (config.measurementInterval * 3600000)) {
+  if (measurementState == IDLE && !isManualMode && 
+      millis() - lastMeasurementMillis >= (config.measurementInterval * 3600000)) {
     performMeasurement();
     lastMeasurementMillis = millis();
   }
@@ -134,7 +157,8 @@ void loop() {
   // Control pilot lamps
   controlRelays();
   
-  delay(1000);
+  // Small delay to prevent excessive CPU usage
+  delay(10);
 }
 
 void initializeSystem() {
@@ -455,85 +479,154 @@ void setupWebServer() {
   Serial.println("Web server started");
 }
 
+// Replace the blocking performMeasurement() function with this non-blocking version
 void performMeasurement() {
-  isMeasuring = true;
-  
-  // Step 1: Ensure empty solenoid is closed
-  digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
-  delay(1000);
-  
-  // Step 2: Fill chamber
-  digitalWrite(FILL_SOLENOID_PIN, LOW);
-  delay(config.fillDuration * 1000);
-  digitalWrite(FILL_SOLENOID_PIN, HIGH);
-  
-  // Step 3: Wait for settling
-  delay(config.waitDuration * 1000);
-  
-  // Step 4: Measure angle
-  float angleSum = 0.0;
-  int validReadings = 0;
-  
-  for (int i = 0; i < config.measurementDuration; i++) {
-    sensors_event_t a, g, temp;
-    mpu.getEvent(&a, &g, &temp);
+  if (measurementState == IDLE) {
+    // Start the measurement sequence
+    measurementState = EMPTYING_INITIAL;
+    stateStartTime = millis();
+    isMeasuring = true;
     
-    // Calculate angle from accelerometer
-    float angle = atan2(a.acceleration.y, a.acceleration.z) * 180.0 / PI;
+    // Reset measurement variables
+    angleSum = 0.0;
+    validReadings = 0;
+    measurementCount = 0;
+    lastAngleReadTime = 0;
     
-    // Validate reading
-    if (abs(angle) < 90) { // Reasonable angle range
-      angleSum += angle;
-      validReadings++;
-    }
+    // Ensure empty solenoid is closed
+    digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
     
-    delay(1000);
+    Serial.println("Starting measurement sequence...");
   }
-  
-  if (validReadings > 0) {
-    currentAngle = (angleSum / validReadings) + config.calibrationOffset;
-    currentDensity = angleToDensity(currentAngle * config.calibrationScale);
-    lastMeasurement = currentDensity;
-    lastMeasurementTime = rtc.now();
-    
-    // Log measurement details
-    Serial.print("Measurement completed - Angle: ");
-    Serial.print(currentAngle);
-    Serial.print("°, Density: ");
-    Serial.print(currentDensity, 4);
-    Serial.print(", Valid readings: ");
-    Serial.print(validReadings);
-    Serial.print("/");
-    Serial.println(config.measurementDuration);
-    
-    // Save measurement data
-    saveMeasurementData(currentDensity, lastMeasurementTime);
-  } else {
-    Serial.println("No valid readings obtained during measurement");
-  }
-  
-  // Step 5: Empty chamber
-  digitalWrite(EMPTY_SOLENOID_PIN, LOW);
-  delay(config.emptyDuration * 1000);
-  digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
-  
-  // Calculate next measurement time
-  DateTime now = rtc.now();
-  nextMeasurementTime = DateTime(now.unixtime() + (config.measurementInterval * 3600));
-  
-  isMeasuring = false;
 }
 
+// Add this function to handle the measurement state machine
+void updateMeasurementState() {
+  if (measurementState == IDLE) {
+    return;
+  }
+  
+  unsigned long currentTime = millis();
+  unsigned long elapsedTime = currentTime - stateStartTime;
+  
+  switch (measurementState) {
+    case EMPTYING_INITIAL:
+      if (elapsedTime >= 1000) { // 1 second delay
+        // Step 2: Fill chamber
+        digitalWrite(FILL_SOLENOID_PIN, LOW);
+        measurementState = FILLING;
+        stateStartTime = currentTime;
+        Serial.println("Filling chamber...");
+      }
+      break;
+      
+    case FILLING:
+      if (elapsedTime >= (config.fillDuration * 1000)) {
+        digitalWrite(FILL_SOLENOID_PIN, HIGH);
+        measurementState = WAITING_TO_SETTLE;
+        stateStartTime = currentTime;
+        Serial.println("Waiting for settling...");
+      }
+      break;
+      
+    case WAITING_TO_SETTLE:
+      if (elapsedTime >= (config.waitDuration * 1000)) {
+        measurementState = MEASURING;
+        stateStartTime = currentTime;
+        lastAngleReadTime = currentTime;
+        Serial.println("Starting angle measurements...");
+      }
+      break;
+      
+    case MEASURING:
+      // Take angle readings every second
+      if (currentTime - lastAngleReadTime >= 1000) {
+        if (measurementCount < config.measurementDuration) {
+          sensors_event_t a, g, temp;
+          mpu.getEvent(&a, &g, &temp);
+          
+          // Calculate angle from accelerometer
+          float angle = atan2(a.acceleration.y, a.acceleration.z) * 180.0 / PI;
+          
+          // Validate reading
+          if (abs(angle) < 90) { // Reasonable angle range
+            angleSum += angle;
+            validReadings++;
+          }
+          
+          measurementCount++;
+          lastAngleReadTime = currentTime;
+          
+          Serial.print("Measurement ");
+          Serial.print(measurementCount);
+          Serial.print("/");
+          Serial.print(config.measurementDuration);
+          Serial.print(" - Angle: ");
+          Serial.print(angle);
+          Serial.println("°");
+        } else {
+          // Measurement complete, process results
+          if (validReadings > 0) {
+            currentAngle = (angleSum / validReadings) + config.calibrationOffset;
+            currentDensity = angleToDensity(currentAngle * config.calibrationScale);
+            lastMeasurement = currentDensity;
+            lastMeasurementTime = rtc.now();
+            
+            // Log measurement details
+            Serial.print("Measurement completed - Angle: ");
+            Serial.print(currentAngle);
+            Serial.print("°, Density: ");
+            Serial.print(currentDensity, 4);
+            Serial.print(", Valid readings: ");
+            Serial.print(validReadings);
+            Serial.print("/");
+            Serial.println(config.measurementDuration);
+            
+            // Save measurement data
+            saveMeasurementData(currentDensity, lastMeasurementTime);
+          } else {
+            Serial.println("No valid readings obtained during measurement");
+          }
+          
+          // Move to emptying phase
+          digitalWrite(EMPTY_SOLENOID_PIN, LOW);
+          measurementState = EMPTYING_FINAL;
+          stateStartTime = currentTime;
+          Serial.println("Emptying chamber...");
+        }
+      }
+      break;
+      
+    case EMPTYING_FINAL:
+      if (elapsedTime >= (config.emptyDuration * 1000)) {
+        digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
+        
+        // Calculate next measurement time
+        DateTime now = rtc.now();
+        nextMeasurementTime = DateTime(now.unixtime() + (config.measurementInterval * 3600));
+        
+        // Reset state
+        measurementState = IDLE;
+        isMeasuring = false;
+        
+        Serial.println("Measurement sequence complete");
+      }
+      break;
+  }
+}
+
+// Update the controlRelays function to use the state machine
 void controlRelays() {
   // Control measuring pilot lamp using single relay
   // LOW = Red light (NC), HIGH = Green light (NO)
   if (isMeasuring) {
     digitalWrite(MEASURING_RELAY_PIN, HIGH);  // Green light (NO)
   } else {
-    digitalWrite(MEASURING_RELAY_PIN, HIGH);   // Red light (NC)
+    digitalWrite(MEASURING_RELAY_PIN, LOW);   // Red light (NC)
   }
 }
 
+// Enhanced updateDisplays function to show measurement progress
 void updateDisplays() {
   DateTime now = rtc.now();
   
@@ -580,10 +673,28 @@ void updateDisplays() {
     now.day(),
     now.month());
   
-  // Show measurement status
+  // Show detailed measurement status
   display2.setCursor(0, 55);
   if (isMeasuring) {
-    display2.print("MEASURING...");
+    switch (measurementState) {
+      case EMPTYING_INITIAL:
+        display2.print("PREPARING...");
+        break;
+      case FILLING:
+        display2.print("FILLING...");
+        break;
+      case WAITING_TO_SETTLE:
+        display2.print("SETTLING...");
+        break;
+      case MEASURING:
+        display2.printf("MEASURING %d/%d", measurementCount, config.measurementDuration);
+        break;
+      case EMPTYING_FINAL:
+        display2.print("EMPTYING...");
+        break;
+      default:
+        display2.print("MEASURING...");
+    }
   } else {
     display2.print("READY");
   }
