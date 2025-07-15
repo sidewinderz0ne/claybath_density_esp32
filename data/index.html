@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Density Measurement System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #34495e;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .status-item {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .status-item .label {
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        
+        .status-item .value {
+            font-size: 1.4em;
+            color: #2c3e50;
+            margin-top: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn.danger {
+            background: #e74c3c;
+        }
+        
+        .btn.danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn.success {
+            background: #27ae60;
+        }
+        
+        .btn.success:hover {
+            background: #219a52;
+        }
+        
+        .control-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .relay-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .measuring {
+            background: #e8f5e8 !important;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .datetime-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .datetime-grid input {
+            margin-bottom: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .datetime-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Water Density Measurement System</h1>
+        
+        <div class="grid">
+            <!-- Status Panel -->
+            <div class="card">
+                <h2>System Status</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="label">Current Angle</div>
+                        <div class="value" id="currentAngle">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Current Density</div>
+                        <div class="value" id="currentDensity">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Last Measurement</div>
+                        <div class="value" id="lastMeasurement">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Next Measurement</div>
+                        <div class="value" id="nextMeasurement">--</div>
+                    </div>
+                    <div class="status-item" id="measuringStatus">
+                        <div class="label">Status</div>
+                        <div class="value" id="systemStatus">Ready</div>
+                    </div>
+                </div>
+                <div class="control-buttons">
+                    <button class="btn success" onclick="startMeasurement()">Start Measurement</button>
+                    <button class="btn" onclick="refreshStatus()">Refresh Status</button>
+                </div>
+            </div>
+            
+            <!-- Settings Panel -->
+            <div class="card">
+                <h2>Settings</h2>
+                <div class="form-group">
+                    <label for="desiredDensity">Desired Density</label>
+                    <input type="number" id="desiredDensity" step="0.001" value="1.025">
+                </div>
+                <div class="form-group">
+                    <label for="measurementInterval">Measurement Interval (hours)</label>
+                    <input type="number" id="measurementInterval" value="2">
+                </div>
+                <div class="form-group">
+                    <label for="fillDuration">Fill Duration (seconds)</label>
+                    <input type="number" id="fillDuration" value="5">
+                </div>
+                <div class="form-group">
+                    <label for="waitDuration">Wait Duration (seconds)</label>
+                    <input type="number" id="waitDuration" value="60">
+                </div>
+                <div class="form-group">
+                    <label for="measurementDuration">Measurement Duration (seconds)</label>
+                    <input type="number" id="measurementDuration" value="10">
+                </div>
+                <div class="form-group">
+                    <label for="emptyDuration">Empty Duration (seconds)</label>
+                    <input type="number" id="emptyDuration" value="120">
+                </div>
+                <button class="btn success" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <!-- Calibration Panel -->
+            <div class="card">
+                <h2>MPU6050 Calibration</h2>
+                <div class="form-group">
+                    <label for="calibrationOffset">Calibration Offset</label>
+                    <input type="number" id="calibrationOffset" step="0.01" value="0.0">
+                </div>
+                <div class="form-group">
+                    <label for="calibrationScale">Calibration Scale</label>
+                    <input type="number" id="calibrationScale" step="0.01" value="1.0">
+                </div>
+                <button class="btn success" onclick="saveCalibration()">Save Calibration</button>
+            </div>
+            
+            <!-- Manual Control Panel -->
+            <div class="card">
+                <h2>Manual Control</h2>
+                <div class="relay-control">
+                    <span>Fill Solenoid</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="fillSolenoid" onchange="controlRelay('fill_solenoid', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="relay-control">
+                    <span>Empty Solenoid</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="emptySolenoid" onchange="controlRelay('empty_solenoid', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="relay-control">
+                    <span>Measuring Light (OFF=Red, ON=Green)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="measuringRelay" onchange="controlRelay('measuring_relay', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <!-- Date/Time Settings -->
+            <div class="card">
+                <h2>Date & Time Settings</h2>
+                <div class="datetime-grid">
+                    <div class="form-group">
+                        <label for="year">Year</label>
+                        <input type="number" id="year" value="2024">
+                    </div>
+                    <div class="form-group">
+                        <label for="month">Month</label>
+                        <input type="number" id="month" min="1" max="12" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="day">Day</label>
+                        <input type="number" id="day" min="1" max="31" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="hour">Hour</label>
+                        <input type="number" id="hour" min="0" max="23" value="12">
+                    </div>
+                    <div class="form-group">
+                        <label for="minute">Minute</label>
+                        <input type="number" id="minute" min="0" max="59" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="second">Second</label>
+                        <input type="number" id="second" min="0" max="59" value="0">
+                    </div>
+                </div>
+                <button class="btn success" onclick="setDateTime()">Set Date & Time</button>
+            </div>
+            
+            <!-- Data Management -->
+            <div class="card">
+                <h2>Data Management</h2>
+                <div class="status-item">
+                    <div class="label">Last Measurement Time</div>
+                    <div class="value" id="lastMeasurementTime">--</div>
+                </div>
+                <div class="control-buttons">
+                    <button class="btn" onclick="downloadData()">Download Data</button>
+                    <button class="btn danger" onclick="deleteData()">Delete All Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let statusInterval;
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            refreshStatus();
+            // Auto-refresh status every 5 seconds
+            statusInterval = setInterval(refreshStatus, 5000);
+        });
+        
+        // Load settings from device
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('desiredDensity').value = config.desiredDensity;
+                document.getElementById('measurementInterval').value = config.measurementInterval;
+                document.getElementById('fillDuration').value = config.fillDuration;
+                document.getElementById('waitDuration').value = config.waitDuration;
+                document.getElementById('measurementDuration').value = config.measurementDuration;
+                document.getElementById('emptyDuration').value = config.emptyDuration;
+                document.getElementById('calibrationOffset').value = config.calibrationOffset;
+                document.getElementById('calibrationScale').value = config.calibrationScale;
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+        
+        // Save settings to device
+        async function saveSettings() {
+            const config = {
+                desiredDensity: parseFloat(document.getElementById('desiredDensity').value),
+                measurementInterval: parseInt(document.getElementById('measurementInterval').value),
+                fillDuration: parseInt(document.getElementById('fillDuration').value),
+                waitDuration: parseInt(document.getElementById('waitDuration').value),
+                measurementDuration: parseInt(document.getElementById('measurementDuration').value),
+                emptyDuration: parseInt(document.getElementById('emptyDuration').value),
+                calibrationOffset: parseFloat(document.getElementById('calibrationOffset').value),
+                calibrationScale: parseFloat(document.getElementById('calibrationScale').value)
+            };
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    alert('Settings saved successfully!');
+                } else {
+                    alert('Error saving settings');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                alert('Error saving settings');
+            }
+        }
+        
+        // Save calibration settings
+        async function saveCalibration() {
+            const config = {
+                calibrationOffset: parseFloat(document.getElementById('calibrationOffset').value),
+                calibrationScale: parseFloat(document.getElementById('calibrationScale').value)
+            };
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    alert('Calibration saved successfully!');
+                } else {
+                    alert('Error saving calibration');
+                }
+            } catch (error) {
+                console.error('Error saving calibration:', error);
+                alert('Error saving calibration');
+            }
+        }
+        
+        // Refresh system status
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                document.getElementById('currentAngle').textContent = status.currentAngle.toFixed(2) + '°';
+                document.getElementById('currentDensity').textContent = status.currentDensity.toFixed(3);
+                document.getElementById('lastMeasurement').textContent = status.lastMeasurement.toFixed(3);
+                document.getElementById('nextMeasurement').textContent = formatDateTime(status.nextMeasurementTime);
+                document.getElementById('lastMeasurementTime').textContent = formatDateTime(status.lastMeasurementTime);
+                
+                const statusElement = document.getElementById('systemStatus');
+                const measuringStatus = document.getElementById('measuringStatus');
+                
+                if (status.isMeasuring) {
+                    statusElement.textContent = 'Measuring...';
+                    measuringStatus.classList.add('measuring');
+                } else {
+                    statusElement.textContent = 'Ready';
+                    measuringStatus.classList.remove('measuring');
+                }
+            } catch (error) {
+                console.error('Error refreshing status:', error);
+            }
+        }
+        
+        // Start manual measurement
+        async function startMeasurement() {
+            try {
+                const response = await fetch('/api/measure', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert('Measurement started!');
+                    refreshStatus();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error starting measurement:', error);
+                alert('Error starting measurement');
+            }
+        }
+        
+        // Control relay
+        async function controlRelay(action, state) {
+            try {
+                const response = await fetch('/api/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        state: state
+                    })
+                });
+                
+                if (!response.ok) {
+                    alert('Error controlling relay');
+                }
+            } catch (error) {
+                console.error('Error controlling relay:', error);
+                alert('Error controlling relay');
+            }
+        }
+        
+        // Set date and time
+        async function setDateTime() {
+            const dateTime = {
+                year: parseInt(document.getElementById('year').value),
+                month: parseInt(document.getElementById('month').value),
+                day: parseInt(document.getElementById('day').value),
+                hour: parseInt(document.getElementById('hour').value),
+                minute: parseInt(document.getElementById('minute').value),
+                second: parseInt(document.getElementById('second').value)
+            };
+            
+            try {
+                const response = await fetch('/api/datetime', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dateTime)
+                });
+                
+                if (response.ok) {
+                    alert('Date and time set successfully!');
+                    refreshStatus();
+                } else {
+                    alert('Error setting date and time');
+                }
+            } catch (error) {
+                console.error('Error setting date and time:', error);
+                alert('Error setting date and time');
+            }
+        }
+        
+        // Download measurement data
+        async function downloadData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.text();
+                
+                const blob = new Blob([data], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'measurement_data.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                console.error('Error downloading data:', error);
+                alert('Error downloading data');
+            }
+        }
+        
+        // Delete all measurement data
+        async function deleteData() {
+            if (confirm('Are you sure you want to delete all measurement data? This cannot be undone.')) {
+                try {
+                    const response = await fetch('/api/data', {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        alert('All measurement data deleted successfully!');
+                    } else {
+                        alert('Error deleting data');
+                    }
+                } catch (error) {
+                    console.error('Error deleting data:', error);
+                    alert('Error deleting data');
+                }
+            }
+        }
+        
+        // Format datetime for display
+        function formatDateTime(timestamp) {
+            if (!timestamp) return '--';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+        
+        // Set current date and time in form
+        function setCurrentDateTime() {
+            const now = new Date();
+            document.getElementById('year').value = now.getFullYear();
+            document.getElementById('month').value = now.getMonth() + 1;
+            document.getElementById('day').value = now.getDate();
+            document.getElementById('hour').value = now.getHours();
+            document.getElementById('minute').value = now.getMinutes();
+            document.getElementById('second').value = now.getSeconds();
+        }
+        
+        // Initialize current date/time on page load
+        setCurrentDateTime();
+    </script>
+</body>
+</html>
