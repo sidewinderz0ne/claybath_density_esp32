@@ -41,6 +41,10 @@ Adafruit_SSD1306 display2(SCREEN_WIDTH, SCREEN_HEIGHT, &I2C_2, OLED_RESET);
 RTC_DS3231 rtc;
 WebServer server(80);
 
+// Serial logging buffer for web interface
+String serialBuffer = "";
+const int MAX_SERIAL_BUFFER = 10000; // Maximum characters in buffer
+
 // Add these global variables for non-blocking measurement
 enum MeasurementState {
   IDLE,
@@ -101,9 +105,14 @@ void scanI2CDevices();
 bool checkRTCConnection();
 bool checkMPUConnection();
 void updateMeasurementState();
+void logSerial(String message);
+String getFileList();
+bool deleteFile(String filename);
+String getFileInfo(String filename);
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("Starting Claybath Density Measurement System...");
   
   // Initialize pins
   pinMode(FILL_SOLENOID_PIN, OUTPUT);
@@ -121,6 +130,9 @@ void setup() {
   I2C_1.setClock(100000); // Set I2C clock to 100kHz for stability
   I2C_2.setClock(100000); // Set I2C clock to 100kHz for stability
   
+  // Small delay to allow I2C buses to stabilize
+  delay(500);
+  
   // Scan I2C devices for debugging
   scanI2CDevices();
   
@@ -133,7 +145,44 @@ void setup() {
   // Setup web server
   setupWebServer();
   
-  Serial.println("Claybath density measurement system initialized");
+  // Now we can use logSerial safely
+  logSerial("Claybath density measurement system initialized");
+}
+
+// Enhanced logSerial function for web interface
+void logSerial(String message) {
+  String timestamp = "";
+  
+  // Only try to get RTC time if it's been initialized and working
+  if (checkRTCConnection()) {
+    DateTime now = rtc.now();
+    timestamp = String(now.hour()) + ":" + 
+               String(now.minute()) + ":" + 
+               String(now.second());
+  } else {
+    // Use millis() as fallback timestamp
+    unsigned long ms = millis();
+    unsigned long seconds = ms / 1000;
+    unsigned long minutes = seconds / 60;
+    unsigned long hours = minutes / 60;
+    timestamp = String(hours % 24) + ":" + 
+               String(minutes % 60) + ":" + 
+               String(seconds % 60);
+  }
+  
+  String logMessage = "[" + timestamp + "] " + message;
+  Serial.println(logMessage);
+  
+  // Add to web serial buffer
+  serialBuffer += logMessage + "\n";
+  
+  // Trim buffer if too long
+  if (serialBuffer.length() > MAX_SERIAL_BUFFER) {
+    int newlinePos = serialBuffer.indexOf('\n', serialBuffer.length() - MAX_SERIAL_BUFFER);
+    if (newlinePos != -1) {
+      serialBuffer = serialBuffer.substring(newlinePos + 1);
+    }
+  }
 }
 
 // Updated main loop
@@ -255,9 +304,11 @@ void initializeSystem() {
   
   delay(2000);
   
-  // Calculate next measurement time
-  DateTime now = rtc.now();
-  nextMeasurementTime = DateTime(now.unixtime() + (config.measurementInterval * 3600));
+  // Calculate next measurement time only if RTC is working
+  if (checkRTCConnection()) {
+    DateTime now = rtc.now();
+    nextMeasurementTime = DateTime(now.unixtime() + (config.measurementInterval * 3600));
+  }
   
   Serial.println("System initialization complete");
 }
@@ -283,6 +334,7 @@ void loadConfig() {
       config.timezone = String(timezoneStr);
       
       file.close();
+      logSerial("Configuration loaded from settings.json");
     }
   }
 }
@@ -303,6 +355,7 @@ void saveConfig() {
   if (file) {
     serializeJson(doc, file);
     file.close();
+    logSerial("Configuration saved to settings.json");
   }
 }
 
@@ -310,9 +363,8 @@ void setupWiFiHotspot() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP("ClaybathDensityMeter", "12345678");
   
-  Serial.println("WiFi Hotspot started");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.softAPIP());
+  logSerial("WiFi Hotspot started");
+  logSerial("IP address: " + WiFi.softAPIP().toString());
 }
 
 void setupWebServer() {
@@ -333,6 +385,40 @@ void setupWebServer() {
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
+  });
+  
+  // Add new API endpoint for file list
+  server.on("/api/files", HTTP_GET, []() {
+    String fileList = getFileList();
+    server.send(200, "application/json", fileList);
+  });
+  
+  // Add new API endpoint for serial output
+  server.on("/api/serial", HTTP_GET, []() {
+    DynamicJsonDocument doc(2048);
+    doc["output"] = serialBuffer;
+    
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+  });
+  
+  // Add new API endpoint for individual file operations
+  server.on("/api/file", HTTP_DELETE, []() {
+    if (server.hasArg("name")) {
+      String filename = server.arg("name");
+      bool success = deleteFile(filename);
+      
+      DynamicJsonDocument doc(256);
+      doc["success"] = success;
+      doc["message"] = success ? "File deleted successfully" : "Failed to delete file";
+      
+      String response;
+      serializeJson(doc, response);
+      server.send(success ? 200 : 400, "application/json", response);
+    } else {
+      server.send(400, "application/json", "{\"error\":\"filename_required\"}");
+    }
   });
   
   server.on("/api/config", HTTP_GET, []() {
@@ -374,6 +460,7 @@ void setupWebServer() {
       }
       
       saveConfig();
+      logSerial("Configuration updated via web interface");
       server.send(200, "application/json", "{\"status\":\"success\"}");
     } else {
       server.send(400, "application/json", "{\"error\":\"no_data\"}");
@@ -383,6 +470,7 @@ void setupWebServer() {
   server.on("/api/measure", HTTP_POST, []() {
     if (!isMeasuring) {
       performMeasurement();
+      logSerial("Manual measurement started via web interface");
       server.send(200, "application/json", "{\"status\":\"measurement_started\"}");
     } else {
       server.send(400, "application/json", "{\"error\":\"measurement_in_progress\"}");
@@ -400,10 +488,13 @@ void setupWebServer() {
       
       if (action == "fill_solenoid") {
         digitalWrite(FILL_SOLENOID_PIN, state ? LOW : HIGH);
+        logSerial("Fill solenoid " + String(state ? "activated" : "deactivated") + " via web interface");
       } else if (action == "empty_solenoid") {
         digitalWrite(EMPTY_SOLENOID_PIN, state ? LOW : HIGH);
+        logSerial("Empty solenoid " + String(state ? "activated" : "deactivated") + " via web interface");
       } else if (action == "measuring_relay") {
         digitalWrite(MEASURING_RELAY_PIN, state ? LOW : HIGH);
+        logSerial("Measuring relay " + String(state ? "activated" : "deactivated") + " via web interface");
       }
       
       server.send(200, "application/json", "{\"status\":\"success\"}");
@@ -430,18 +521,9 @@ void setupWebServer() {
       
       // Verify the time was set
       DateTime now = rtc.now();
-      Serial.print("RTC time set to: ");
-      Serial.print(now.year(), DEC);
-      Serial.print('/');
-      Serial.print(now.month(), DEC);
-      Serial.print('/');
-      Serial.print(now.day(), DEC);
-      Serial.print(" ");
-      Serial.print(now.hour(), DEC);
-      Serial.print(':');
-      Serial.print(now.minute(), DEC);
-      Serial.print(':');
-      Serial.println(now.second(), DEC);
+      logSerial("RTC time set to: " + String(now.year()) + "/" + 
+                String(now.month()) + "/" + String(now.day()) + " " + 
+                String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()));
       
       server.send(200, "application/json", "{\"status\":\"success\"}");
     } else {
@@ -456,6 +538,7 @@ void setupWebServer() {
   
   server.on("/api/data", HTTP_DELETE, []() {
     deleteMeasurementData();
+    logSerial("All measurement data deleted via web interface");
     server.send(200, "application/json", "{\"status\":\"success\"}");
   });
   
@@ -476,7 +559,63 @@ void setupWebServer() {
   });
   
   server.begin();
-  Serial.println("Web server started");
+  logSerial("Web server started");
+}
+
+// File management functions
+String getFileList() {
+  DynamicJsonDocument doc(2048);
+  JsonArray files = doc.createNestedArray("files");
+  
+  File root = LittleFS.open("/");
+  File file = root.openNextFile();
+  
+  while (file) {
+    if (!file.isDirectory()) {
+      JsonObject fileObj = files.createNestedObject();
+      fileObj["name"] = String(file.name());
+      fileObj["size"] = file.size();
+      
+      // Get file modification time if available
+      time_t t = file.getLastWrite();
+      fileObj["lastModified"] = t;
+    }
+    file = root.openNextFile();
+  }
+  
+  String result;
+  serializeJson(doc, result);
+  return result;
+}
+
+bool deleteFile(String filename) {
+  if (filename.startsWith("/")) {
+    return LittleFS.remove(filename);
+  } else {
+    return LittleFS.remove("/" + filename);
+  }
+}
+
+String getFileInfo(String filename) {
+  if (!filename.startsWith("/")) {
+    filename = "/" + filename;
+  }
+  
+  if (LittleFS.exists(filename)) {
+    File file = LittleFS.open(filename, "r");
+    if (file) {
+      DynamicJsonDocument doc(512);
+      doc["name"] = filename;
+      doc["size"] = file.size();
+      doc["lastModified"] = file.getLastWrite();
+      file.close();
+      
+      String result;
+      serializeJson(doc, result);
+      return result;
+    }
+  }
+  return "{}";
 }
 
 // Replace the blocking performMeasurement() function with this non-blocking version
@@ -496,7 +635,7 @@ void performMeasurement() {
     // Ensure empty solenoid is closed
     digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
     
-    Serial.println("Starting measurement sequence...");
+    logSerial("Starting measurement sequence...");
   }
 }
 
@@ -516,7 +655,7 @@ void updateMeasurementState() {
         digitalWrite(FILL_SOLENOID_PIN, LOW);
         measurementState = FILLING;
         stateStartTime = currentTime;
-        Serial.println("Filling chamber...");
+        logSerial("Filling chamber...");
       }
       break;
       
@@ -525,7 +664,7 @@ void updateMeasurementState() {
         digitalWrite(FILL_SOLENOID_PIN, HIGH);
         measurementState = WAITING_TO_SETTLE;
         stateStartTime = currentTime;
-        Serial.println("Waiting for settling...");
+        logSerial("Waiting for settling...");
       }
       break;
       
@@ -534,7 +673,7 @@ void updateMeasurementState() {
         measurementState = MEASURING;
         stateStartTime = currentTime;
         lastAngleReadTime = currentTime;
-        Serial.println("Starting angle measurements...");
+        logSerial("Starting angle measurements...");
       }
       break;
       
@@ -557,13 +696,9 @@ void updateMeasurementState() {
           measurementCount++;
           lastAngleReadTime = currentTime;
           
-          Serial.print("Measurement ");
-          Serial.print(measurementCount);
-          Serial.print("/");
-          Serial.print(config.measurementDuration);
-          Serial.print(" - Angle: ");
-          Serial.print(angle);
-          Serial.println("°");
+          logSerial("Measurement " + String(measurementCount) + "/" + 
+                   String(config.measurementDuration) + " - Angle: " + 
+                   String(angle, 2) + "°");
         } else {
           // Measurement complete, process results
           if (validReadings > 0) {
@@ -573,26 +708,22 @@ void updateMeasurementState() {
             lastMeasurementTime = rtc.now();
             
             // Log measurement details
-            Serial.print("Measurement completed - Angle: ");
-            Serial.print(currentAngle);
-            Serial.print("°, Density: ");
-            Serial.print(currentDensity, 4);
-            Serial.print(", Valid readings: ");
-            Serial.print(validReadings);
-            Serial.print("/");
-            Serial.println(config.measurementDuration);
+            logSerial("Measurement completed - Angle: " + String(currentAngle, 2) + 
+                     "°, Density: " + String(currentDensity, 4) + 
+                     ", Valid readings: " + String(validReadings) + "/" + 
+                     String(config.measurementDuration));
             
             // Save measurement data
             saveMeasurementData(currentDensity, lastMeasurementTime);
           } else {
-            Serial.println("No valid readings obtained during measurement");
+            logSerial("No valid readings obtained during measurement");
           }
           
           // Move to emptying phase
           digitalWrite(EMPTY_SOLENOID_PIN, LOW);
           measurementState = EMPTYING_FINAL;
           stateStartTime = currentTime;
-          Serial.println("Emptying chamber...");
+          logSerial("Emptying chamber...");
         }
       }
       break;
@@ -609,7 +740,7 @@ void updateMeasurementState() {
         measurementState = IDLE;
         isMeasuring = false;
         
-        Serial.println("Measurement sequence complete");
+        logSerial("Measurement sequence complete");
       }
       break;
   }
@@ -639,9 +770,9 @@ void updateDisplays() {
   display1.setCursor(0, 12);
   display1.printf("%.3f", config.desiredDensity);
   display1.setTextSize(1);
-  display1.setCursor(0, 35);
+  display1.setCursor(0, 28);
   display1.println("NEXT MEASUREMENT");
-  display1.setCursor(0, 45);
+  display1.setCursor(0, 36);
   display1.printf("%02d:%02d %02d/%02d/%02d", 
     nextMeasurementTime.hour(), 
     nextMeasurementTime.minute(),
@@ -663,9 +794,9 @@ void updateDisplays() {
     display2.print("--");
   }
   display2.setTextSize(1);
-  display2.setCursor(0, 35);
+  display2.setCursor(0, 28);
   display2.println("CURRENT TIME");
-  display2.setCursor(0, 45);
+  display2.setCursor(0, 36);
   display2.printf("%02d:%02d:%02d %02d/%02d", 
     now.hour(), 
     now.minute(),
@@ -714,6 +845,9 @@ void saveMeasurementData(float density, DateTime timestamp) {
       timestamp.hour(), timestamp.minute(), timestamp.second(),
       density, currentAngle);
     file.close();
+    logSerial("Measurement data saved to " + filename);
+  } else {
+    logSerial("Failed to save measurement data to " + filename);
   }
 }
 
@@ -748,6 +882,7 @@ void deleteMeasurementData() {
     String filename = file.name();
     if (filename.startsWith("/data_") && filename.endsWith(".csv")) {
       LittleFS.remove(filename);
+      logSerial("Deleted data file: " + filename);
     }
     file = root.openNextFile();
   }
@@ -781,17 +916,17 @@ void scanI2CDevices() {
     byte error = I2C_1.endTransmission();
     
     if (error == 0) {
-      Serial.print("I2C device found on Bus 1 at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.print(address, HEX);
+      String deviceInfo = "I2C device found on Bus 1 at address 0x";
+      if (address < 16) deviceInfo += "0";
+      deviceInfo += String(address, HEX);
       
       // Identify known devices
       if (address == 0x68) {
-        Serial.print(" (MPU6050)");
+        deviceInfo += " (MPU6050)";
       } else if (address == 0x3C) {
-        Serial.print(" (OLED Display 1)");
+        deviceInfo += " (OLED Display 1)";
       }
-      Serial.println();
+      Serial.println(deviceInfo);
       deviceCount1++;
     }
   }
@@ -804,17 +939,17 @@ void scanI2CDevices() {
     byte error = I2C_2.endTransmission();
     
     if (error == 0) {
-      Serial.print("I2C device found on Bus 2 at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.print(address, HEX);
+      String deviceInfo = "I2C device found on Bus 2 at address 0x";
+      if (address < 16) deviceInfo += "0";
+      deviceInfo += String(address, HEX);
       
       // Identify known devices
       if (address == 0x68) {
-        Serial.print(" (DS3231)");
+        deviceInfo += " (DS3231)";
       } else if (address == 0x3C) {
-        Serial.print(" (OLED Display 2)");
+        deviceInfo += " (OLED Display 2)";
       }
-      Serial.println();
+      Serial.println(deviceInfo);
       deviceCount2++;
     }
   }
@@ -839,4 +974,5 @@ bool checkMPUConnection() {
 
 void setDateTime(int year, int month, int day, int hour, int minute, int second) {
   rtc.adjust(DateTime(year, month, day, hour, minute, second));
+  logSerial("RTC date/time manually set");
 }
