@@ -9,7 +9,6 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_SSD1306.h>
 #include <RTClib.h>
-#include <time.h>
 
 // Pin definitions
 #define FILL_SOLENOID_PIN 25
@@ -32,6 +31,19 @@
 #define OLED1_ADDRESS 0x3C
 #define OLED2_ADDRESS 0x3D
 
+// Serial logging buffer configuration
+#define SERIAL_BUFFER_SIZE 100 // Reduced buffer size
+
+// Optimized circular buffer for serial messages
+struct LogMessage {
+  unsigned long timestamp;
+  char message[80]; // Fixed size message buffer
+};
+
+LogMessage serialBuffer[SERIAL_BUFFER_SIZE];
+int serialBufferIndex = 0;
+int totalMessages = 0;
+
 // Global objects
 Adafruit_MPU6050 mpu;
 TwoWire I2C_1 = TwoWire(0);  // I2C Bus 1 for MPU6050 and OLED1
@@ -40,10 +52,6 @@ Adafruit_SSD1306 display1(SCREEN_WIDTH, SCREEN_HEIGHT, &I2C_1, OLED_RESET);
 Adafruit_SSD1306 display2(SCREEN_WIDTH, SCREEN_HEIGHT, &I2C_2, OLED_RESET);
 RTC_DS3231 rtc;
 WebServer server(80);
-
-// Serial logging buffer for web interface
-String serialBuffer = "";
-const int MAX_SERIAL_BUFFER = 10000; // Maximum characters in buffer
 
 // Add these global variables for non-blocking measurement
 enum MeasurementState {
@@ -72,7 +80,6 @@ struct Config {
   int emptyDuration = 120; // seconds
   float calibrationOffset = 0.0;
   float calibrationScale = 1.0;
-  String timezone = "UTC";
   float lastMeasurementValue = 0.0;
   unsigned long lastMeasurementTime = 0; // Unix timestamp
 } config;
@@ -86,6 +93,7 @@ DateTime nextMeasurementTime;
 bool isMeasuring = false;
 bool isManualMode = false;
 unsigned long lastMeasurementMillis = 0;
+bool rtcAvailable = false;
 
 // Function prototypes
 void initializeSystem();
@@ -113,9 +121,69 @@ void logSerial(String message);
 String getFileList();
 bool deleteFile(String filename);
 String getFileInfo(String filename);
+String formatTime(DateTime dt);
 
-bool rtcAvailable = false;
+// Enhanced logSerial function with circular buffer
+void logSerial(String message) {
+  DateTime now;
+  String timestampStr;
+  
+  if (rtcAvailable) {
+    now = rtc.now();
+    timestampStr = formatTime(now);
+  } else {
+    timestampStr = "??:??:??";
+  }
 
+  // Create the complete log message
+  String logMessage = "[" + timestampStr + "] " + message;
+  
+  // Print to both Serial (PlatformIO terminal) and web buffer
+  Serial.println(logMessage);
+  
+  // Add to circular buffer for web interface
+  strncpy(serialBuffer[serialBufferIndex].message, logMessage.c_str(), 79);
+  serialBuffer[serialBufferIndex].message[79] = '\0'; // Ensure null termination
+  serialBuffer[serialBufferIndex].timestamp = millis();
+  
+  serialBufferIndex = (serialBufferIndex + 1) % SERIAL_BUFFER_SIZE;
+  totalMessages++;
+}
+
+// Function to get serial buffer for web interface
+String getSerialBuffer() {
+  String result = "";
+  int startIndex;
+  int count = min(totalMessages, SERIAL_BUFFER_SIZE);
+  
+  if (totalMessages >= SERIAL_BUFFER_SIZE) {
+    startIndex = serialBufferIndex;
+  } else {
+    startIndex = 0;
+  }
+  
+  for (int i = 0; i < count; i++) {
+    int index = (startIndex + i) % SERIAL_BUFFER_SIZE;
+    result += serialBuffer[index].message;
+    result += "\n";
+  }
+  
+  return result;
+}
+
+// Function to clear serial buffer
+void clearSerialBuffer() {
+  serialBufferIndex = 0;
+  totalMessages = 0;
+  memset(serialBuffer, 0, sizeof(serialBuffer));
+}
+
+// Simple time formatting function
+String formatTime(DateTime dt) {
+  char buffer[20];
+  sprintf(buffer, "%02d:%02d:%02d", dt.hour(), dt.minute(), dt.second());
+  return String(buffer);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -150,29 +218,6 @@ void setup() {
   
   logSerial("Claybath density measurement system initialized");
 }
-
-// Enhanced logSerial function for web interface
-void logSerial(String message) {
-  String timestamp;
-  if (rtcAvailable) {
-    DateTime now = rtc.now();
-    timestamp = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second());
-  } else {
-    timestamp = "??:??:??";
-  }
-
-  String logMessage = "[" + timestamp + "] " + message;
-  Serial.println(logMessage);
-
-  serialBuffer += logMessage + "\n";
-  if (serialBuffer.length() > MAX_SERIAL_BUFFER) {
-    int newlinePos = serialBuffer.indexOf('\n', serialBuffer.length() - MAX_SERIAL_BUFFER);
-    if (newlinePos != -1) {
-      serialBuffer = serialBuffer.substring(newlinePos + 1);
-    }
-  }
-}
-
 
 // Updated main loop
 void loop() {
@@ -227,7 +272,7 @@ void initializeSystem() {
     
     // Print current time
     DateTime now = rtc.now();
-    logSerial("Current RTC time: " + String(now.year()) + "/" + 
+    logSerial("Current time: " + String(now.year()) + "/" + 
               String(now.month()) + "/" + String(now.day()) + " " + 
               String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()));
   }
@@ -343,10 +388,6 @@ void loadConfig() {
       config.lastMeasurementValue = doc["lastMeasurementValue"] | 0.0;
       config.lastMeasurementTime = doc["lastMeasurementTime"] | 0;
       
-      // Handle String assignment properly
-      const char* timezoneStr = doc["timezone"] | "UTC";
-      config.timezone = String(timezoneStr);
-      
       file.close();
       logSerial("Configuration loaded from settings.json");
       
@@ -377,7 +418,6 @@ void createDefaultConfig() {
   config.emptyDuration = 120;
   config.calibrationOffset = 0.0;
   config.calibrationScale = 1.0;
-  config.timezone = "UTC";
   config.lastMeasurementValue = 0.0;
   config.lastMeasurementTime = 0;
   
@@ -396,7 +436,6 @@ void saveConfig() {
   doc["emptyDuration"] = config.emptyDuration;
   doc["calibrationOffset"] = config.calibrationOffset;
   doc["calibrationScale"] = config.calibrationScale;
-  doc["timezone"] = config.timezone;
   doc["lastMeasurementValue"] = config.lastMeasurementValue;
   doc["lastMeasurementTime"] = config.lastMeasurementTime;
   
@@ -445,14 +484,23 @@ void setupWebServer() {
     server.send(200, "application/json", fileList);
   });
   
-  // Add new API endpoint for serial output
+  // Updated API endpoint for serial output
   server.on("/api/serial", HTTP_GET, []() {
-    DynamicJsonDocument doc(2048);
-    doc["output"] = serialBuffer;
+    DynamicJsonDocument doc(4096);
+    doc["output"] = getSerialBuffer();
+    doc["totalMessages"] = totalMessages;
+    doc["bufferSize"] = SERIAL_BUFFER_SIZE;
     
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
+  });
+  
+  // Add API endpoint to clear serial buffer
+  server.on("/api/serial/clear", HTTP_POST, []() {
+    clearSerialBuffer();
+    logSerial("Serial buffer cleared via web interface");
+    server.send(200, "application/json", "{\"status\":\"success\"}");
   });
   
   // Add new API endpoint for individual file operations
@@ -483,7 +531,6 @@ void setupWebServer() {
     doc["emptyDuration"] = config.emptyDuration;
     doc["calibrationOffset"] = config.calibrationOffset;
     doc["calibrationScale"] = config.calibrationScale;
-    doc["timezone"] = config.timezone;
     doc["lastMeasurementValue"] = config.lastMeasurementValue;
     doc["lastMeasurementTime"] = config.lastMeasurementTime;
     
@@ -506,12 +553,6 @@ void setupWebServer() {
       config.emptyDuration = doc["emptyDuration"];
       config.calibrationOffset = doc["calibrationOffset"];
       config.calibrationScale = doc["calibrationScale"];
-      
-      // Handle String assignment properly
-      if (doc.containsKey("timezone")) {
-        const char* timezoneStr = doc["timezone"];
-        config.timezone = String(timezoneStr);
-      }
       
       saveConfig();
       logSerial("Configuration updated via web interface");
@@ -826,7 +867,7 @@ void updateDisplays() {
   display1.setTextSize(1);
   display1.setCursor(0, 0);
   display1.println("DESIRED DENSITY");
-  display1.setTextSize(2);
+  display1.setTextSize(1);
   display1.setCursor(0, 12);
   display1.printf("%.3f", config.desiredDensity);
   display1.setTextSize(1);
@@ -853,59 +894,7 @@ void updateDisplays() {
   display2.setTextSize(1);
   display2.setCursor(0, 0);
   display2.println("LAST MEASUREMENT");
-  display2.setTextSize(2);
-  display2.setCursor(0, 12);
-  if (lastMeasurement > 0) {
-    display2.printf("%.3f", lastMeasurement);
-  } else {
-    display2.print("--");
-  }
   display2.setTextSize(1);
-  display2.setCursor(0, 28);
-  display2.println("CURRENT TIME");
-  display2.setCursor(0, 36);
-  display2.printf("%02d:%02d:%02d %02d/%02d", 
-    now.hour(), 
-    now.minute(),
-    now.second(),
-    now.day(),
-    now.month());
-  
-  // Show detailed measurement status
-  display2.setCursor(0, 55);
-  if (isMeasuring) {
-    switch (measurementState) {
-      case EMPTYING_INITIAL:
-        display2.print("PREPARING...");
-        break;
-      case FILLING:
-        display2.print("FILLING...");
-        break;
-      case WAITING_TO_SETTLE:
-        display2.print("SETTLING...");
-        break;
-      case MEASURING:
-        display2.printf("MEASURING %d/%d", measurementCount, config.measurementDuration);
-        break;
-      case EMPTYING_FINAL:
-        display2.print("EMPTYING...");
-        break;
-      default:
-        display2.print("MEASURING...");
-    }
-  } else {
-    display2.print("READY");
-  }
-  
-  display2.display();
-
-  
-  // Display 2: Last measurement and current time
-  display2.clearDisplay();
-  display2.setTextSize(1);
-  display2.setCursor(0, 0);
-  display2.println("LAST MEASUREMENT");
-  display2.setTextSize(2);
   display2.setCursor(0, 12);
   if (lastMeasurement > 0) {
     display2.printf("%.3f", lastMeasurement);

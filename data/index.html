@@ -287,6 +287,11 @@
             align-items: center;
         }
         
+        .serial-stats {
+            font-size: 0.9em;
+            color: #95a5a6;
+        }
+        
         .serial-output {
             height: 300px;
             overflow-y: auto;
@@ -295,6 +300,7 @@
             font-size: 12px;
             line-height: 1.4;
             white-space: pre-wrap;
+            background: #2c3e50;
         }
         
         .serial-input {
@@ -500,9 +506,13 @@
             <div class="serial-monitor">
                 <div class="serial-header">
                     <span>System Debug Output</span>
+                    <div class="serial-stats">
+                        <span id="serialStats">Messages: 0/100</span>
+                    </div>
                     <div>
                         <button class="btn btn-small" onclick="clearSerial()">Clear</button>
                         <button class="btn btn-small" id="serialToggle" onclick="toggleSerial()">Pause</button>
+                        <button class="btn btn-small" onclick="refreshSerial()">Refresh</button>
                     </div>
                 </div>
                 <div class="serial-output" id="serialOutput">
@@ -521,6 +531,7 @@
         let timeInterval;
         let serialInterval;
         let serialPaused = false;
+        let lastSerialUpdate = 0;
         
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
@@ -535,7 +546,7 @@
             timeInterval = setInterval(updateCurrentTime, 1000);
             updateCurrentTime();
             
-            // Start serial monitoring
+            // Start real serial monitoring
             startSerialMonitoring();
             
             // Set current datetime in picker
@@ -549,17 +560,39 @@
             document.getElementById('currentTime').textContent = 'Current Time: ' + timeString;
         }
         
-        // Serial monitoring functions
+        // Real serial monitoring functions
         function startSerialMonitoring() {
-            // Simulate serial output - in real implementation, this would connect to the ESP32's serial output
+            // Start monitoring real serial output from ESP32
             serialInterval = setInterval(() => {
                 if (!serialPaused) {
-                    // This is a simulation - replace with actual serial data fetching
-                    simulateSerialData();
+                    refreshSerial();
                 }
-            }, 2000);
+            }, 2000); // Check every 2 seconds
         }
         
+        // Refresh serial output from ESP32
+        async function refreshSerial() {
+            try {
+                const response = await fetch('/api/serial');
+                const data = await response.json();
+                
+                if (data.output !== undefined) {
+                    const output = document.getElementById('serialOutput');
+                    output.textContent = data.output;
+                    output.scrollTop = output.scrollHeight;
+                    
+                    // Update stats
+                    const stats = document.getElementById('serialStats');
+                    stats.textContent = `Messages: ${data.totalMessages || 0}/${data.bufferSize || 100}`;
+                }
+            } catch (error) {
+                console.error('Error fetching serial data:', error);
+                // Fallback to simulated data if real API fails
+                simulateSerialData();
+            }
+        }
+        
+        // Fallback simulation for development
         function simulateSerialData() {
             const messages = [
                 'MPU6050 reading: Angle = 12.34°',
@@ -589,8 +622,23 @@
             }
         }
         
-        function clearSerial() {
-            document.getElementById('serialOutput').textContent = '';
+        async function clearSerial() {
+            try {
+                const response = await fetch('/api/serial/clear', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    document.getElementById('serialOutput').textContent = '';
+                    document.getElementById('serialStats').textContent = 'Messages: 0/100';
+                } else {
+                    console.error('Failed to clear serial buffer');
+                }
+            } catch (error) {
+                console.error('Error clearing serial buffer:', error);
+                // Fallback to local clear
+                document.getElementById('serialOutput').textContent = '';
+            }
         }
         
         function toggleSerial() {
@@ -623,25 +671,14 @@
         // File management functions
         async function refreshFileList() {
             try {
-                // This would need to be implemented on the ESP32 side to return file list
-                // For now, we'll simulate it
-                const files = await getFileList();
-                displayFileList(files);
+                const response = await fetch('/api/files');
+                const data = await response.json();
+                displayFileList(data.files || []);
             } catch (error) {
                 console.error('Error refreshing file list:', error);
                 document.getElementById('fileList').innerHTML = 
                     '<div style="padding: 20px; text-align: center; color: #e74c3c;">Error loading files</div>';
             }
-        }
-        
-        async function getFileList() {
-            // Simulate file list - in real implementation, this would fetch from ESP32
-            return [
-                { name: 'data_2024_01_15.csv', size: '2.3 KB', date: '2024-01-15' },
-                { name: 'data_2024_01_14.csv', size: '1.8 KB', date: '2024-01-14' },
-                { name: 'data_2024_01_13.csv', size: '2.1 KB', date: '2024-01-13' },
-                { name: 'settings.json', size: '512 B', date: '2024-01-15' }
-            ];
         }
         
         function displayFileList(files) {
@@ -652,25 +689,54 @@
                 return;
             }
             
-            fileList.innerHTML = files.map(file => `
-                <div class="file-item">
-                    <div class="file-info">
-                        <div class="file-name">${file.name}</div>
-                        <div class="file-size">${file.size} - ${file.date}</div>
+            fileList.innerHTML = files.map(file => {
+                const size = formatFileSize(file.size);
+                const date = formatDate(file.lastModified);
+                return `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${size} - ${date}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-small" onclick="downloadFile('${file.name}')">Download</button>
+                            <button class="btn btn-small danger" onclick="deleteFile('${file.name}')">Delete</button>
+                        </div>
                     </div>
-                    <div class="file-actions">
-                        <button class="btn btn-small" onclick="downloadFile('${file.name}')">Download</button>
-                        <button class="btn btn-small danger" onclick="deleteFile('${file.name}')">Delete</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString();
         }
         
         async function downloadFile(filename) {
             try {
-                // Implementation would depend on ESP32 API
-                console.log('Downloading file:', filename);
-                alert(`Downloading ${filename}...`);
+                const response = await fetch(`/api/file?name=${encodeURIComponent(filename)}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('Error downloading file');
+                }
             } catch (error) {
                 console.error('Error downloading file:', error);
                 alert('Error downloading file');
@@ -680,10 +746,16 @@
         async function deleteFile(filename) {
             if (confirm(`Are you sure you want to delete ${filename}?`)) {
                 try {
-                    // Implementation would depend on ESP32 API
-                    console.log('Deleting file:', filename);
-                    alert(`${filename} deleted successfully`);
-                    refreshFileList();
+                    const response = await fetch(`/api/file?name=${encodeURIComponent(filename)}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        alert(`${filename} deleted successfully`);
+                        refreshFileList();
+                    } else {
+                        alert('Error deleting file');
+                    }
                 } catch (error) {
                     console.error('Error deleting file:', error);
                     alert('Error deleting file');
@@ -871,14 +943,15 @@
                 return;
             }
             
-            const date = new Date(datetimeValue);
+            const localDate = new Date(datetimeValue);
+            
             const dateTime = {
-                year: date.getFullYear(),
-                month: date.getMonth() + 1,
-                day: date.getDate(),
-                hour: date.getHours(),
-                minute: date.getMinutes(),
-                second: date.getSeconds()
+                year: localDate.getFullYear(),
+                month: localDate.getMonth() + 1,
+                day: localDate.getDate(),
+                hour: localDate.getHours(),
+                minute: localDate.getMinutes(),
+                second: localDate.getSeconds()
             };
             
             try {
@@ -892,7 +965,7 @@
                 
                 if (response.ok) {
                     alert('Date and time set successfully!');
-                    addSerialMessage(`RTC time set to: ${date.toLocaleString()}`);
+                    addSerialMessage(`RTC time set to: ${localDate.toLocaleString()}`);
                     refreshStatus();
                 } else {
                     alert('Error setting date and time');
