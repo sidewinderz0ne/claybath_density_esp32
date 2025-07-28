@@ -73,7 +73,7 @@ unsigned long lastAngleReadTime = 0;
 // Configuration structure
 struct Config {
   float desiredDensity = 1.025;
-  int measurementInterval = 2; // hours
+  int measurementInterval = 30; // minutes (changed from hours)
   int fillDuration = 5; // seconds
   int waitDuration = 60; // seconds
   int measurementDuration = 10; // seconds
@@ -94,6 +94,9 @@ bool isMeasuring = false;
 bool isManualMode = false;
 unsigned long lastMeasurementMillis = 0;
 bool rtcAvailable = false;
+
+unsigned long lastDisplayUpdate = 0;
+int displayPage = 0; // 0 or 1 for alternating pages
 
 // Function prototypes
 void initializeSystem();
@@ -294,17 +297,21 @@ void initializeSystem() {
   // Allow sensor to stabilize
   delay(100);
   
-  // Initialize displays on separate I2C buses
+    // Initialize displays on separate I2C buses
   if (!display1.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
     logSerial("SSD1306 allocation failed for display 1");
   } else {
     logSerial("OLED Display 1 initialized successfully on I2C_1");
+    // Flip display 1 horizontally and vertically
+    display1.setRotation(2); // 180 degree rotation (flip both horizontal and vertical)
   }
   
   if (!display2.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
     logSerial("SSD1306 allocation failed for display 2");
   } else {
     logSerial("OLED Display 2 initialized successfully on I2C_2");
+    // Flip display 2 horizontally and vertically
+    display2.setRotation(2); // 180 degree rotation (flip both horizontal and vertical)
   }
   
   display1.clearDisplay();
@@ -312,22 +319,7 @@ void initializeSystem() {
   display1.setTextSize(1);
   display1.setTextColor(SSD1306_WHITE);
   display2.setTextSize(1);
-  display2.setTextColor(SSD1306_WHITE);
-  
-  // Show initialization message
-  display1.setCursor(0, 0);
-  display1.println("Claybath Density");
-  display1.println("Measurement");
-  display1.println("System");
-  display1.println("Initializing...");
-  display1.display();
-  
-  display2.setCursor(0, 0);
-  display2.println("DS3231 RTC");
-  display2.println("MPU6050 Sensor");
-  display2.println("WiFi Hotspot");
-  display2.println("Starting...");
-  display2.display();
+  display2.setTextColor(SSD1306_WHITE);;
   
   delay(2000);
   
@@ -349,7 +341,8 @@ void calculateNextMeasurementTime() {
         lastMeasurement.month() == now.month() && 
         lastMeasurement.year() == now.year()) {
       // Last measurement was today, schedule next measurement
-      nextMeasurementTime = DateTime((uint32_t)(config.lastMeasurementTime + (config.measurementInterval * 3600)));
+      // Convert minutes to seconds: config.measurementInterval * 60
+      nextMeasurementTime = DateTime((uint32_t)(config.lastMeasurementTime + (config.measurementInterval * 60)));
       logSerial("Next measurement scheduled for: " + String(nextMeasurementTime.timestamp()));
     } else {
       // Last measurement was not today, no automatic measurement scheduled
@@ -359,7 +352,7 @@ void calculateNextMeasurementTime() {
   } else {
     // No previous measurement, no automatic measurement scheduled
     nextMeasurementTime = DateTime((uint32_t)0); // Invalid time indicates no scheduled measurement
-    logSerial("No previous measurement found, no automatic measurement scheduled");
+    logSerial("No previous measurement scheduled, no automatic measurement scheduled");
   }
 }
 
@@ -411,7 +404,7 @@ void loadConfig() {
 void createDefaultConfig() {
   // Reset to default values
   config.desiredDensity = 1.025;
-  config.measurementInterval = 2;
+  config.measurementInterval = 30; // minutes (changed from 2 hours)
   config.fillDuration = 5;
   config.waitDuration = 60;
   config.measurementDuration = 10;
@@ -828,22 +821,23 @@ void updateMeasurementState() {
       }
       break;
       
-    case EMPTYING_FINAL:
-      if (elapsedTime >= (config.emptyDuration * 1000)) {
-        digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
-        
-        // Calculate next measurement time based on current measurement
-        DateTime now = rtc.now();
-        nextMeasurementTime = DateTime((uint32_t)(now.unixtime() + (config.measurementInterval * 3600)));
-        
-        // Reset state
-        measurementState = IDLE;
-        isMeasuring = false;
-        
-        logSerial("Measurement sequence complete");
-        logSerial("Next measurement scheduled for: " + String(nextMeasurementTime.timestamp()));
-      }
-      break;
+case EMPTYING_FINAL:
+  if (elapsedTime >= (config.emptyDuration * 1000)) {
+    digitalWrite(EMPTY_SOLENOID_PIN, HIGH);
+    
+    // Calculate next measurement time based on current measurement
+    DateTime now = rtc.now();
+    // Convert minutes to seconds: config.measurementInterval * 60
+    nextMeasurementTime = DateTime((uint32_t)(now.unixtime() + (config.measurementInterval * 60)));
+    
+    // Reset state
+    measurementState = IDLE;
+    isMeasuring = false;
+    
+    logSerial("Measurement sequence complete");
+    logSerial("Next measurement scheduled for: " + String(nextMeasurementTime.timestamp()));
+  }
+  break;
   }
 }
 
@@ -858,86 +852,100 @@ void controlRelays() {
   }
 }
 
-// Enhanced updateDisplays function to show measurement progress
+// Replace the updateDisplays() function with this updated version
 void updateDisplays() {
   DateTime now = rtc.now();
   
-  // Display 1: Desired density and next measurement time
+  // Check if it's time to switch display pages (every 3 seconds)
+  if (millis() - lastDisplayUpdate >= 3000) {
+    displayPage = (displayPage + 1) % 2; // Toggle between 0 and 1
+    lastDisplayUpdate = millis();
+  }
+  
+  // Display 1: Desired density and next measurement time (2 pages)
   display1.clearDisplay();
   display1.setTextSize(1);
-  display1.setCursor(0, 0);
-  display1.println("DESIRED DENSITY");
-  display1.setTextSize(1);
-  display1.setCursor(0, 12);
-  display1.printf("%.3f", config.desiredDensity);
-  display1.setTextSize(1);
-  display1.setCursor(0, 28);
   
-  if (nextMeasurementTime.unixtime() > 0) {
-    display1.println("NEXT MEASUREMENT");
-    display1.setCursor(0, 36);
-    display1.printf("%02d:%02d %02d/%02d/%02d", 
-      nextMeasurementTime.hour(), 
-      nextMeasurementTime.minute(),
-      nextMeasurementTime.day(),
-      nextMeasurementTime.month(),
-      nextMeasurementTime.year() % 100);
+  if (displayPage == 0) {
+    // Page 0: Desired density
+    display1.setCursor(0, 0);
+    display1.println("DESIRED DENSITY");
+    display1.setCursor(0, 16);
+    display1.setTextSize(2); // Larger text for the value
+    display1.printf("%.3f", config.desiredDensity);
   } else {
-    display1.println("NO SCHEDULED");
-    display1.setCursor(0, 36);
-    display1.println("MEASUREMENT");
+    // Page 1: Next measurement time
+    display1.setCursor(0, 0);
+    if (nextMeasurementTime.unixtime() > 0) {
+      display1.println("NEXT MEASUREMENT");
+      display1.setCursor(0, 16);
+      display1.printf("%02d:%02d %02d/%02d/%02d", 
+        nextMeasurementTime.hour(), 
+        nextMeasurementTime.minute(),
+        nextMeasurementTime.day(),
+        nextMeasurementTime.month(),
+        nextMeasurementTime.year() % 100);
+    } else {
+      display1.println("NO SCHEDULED");
+      display1.setCursor(0, 16);
+      display1.println("MEASUREMENT");
+    }
   }
   display1.display();
   
-  // Display 2: Last measurement and current time
+  // Display 2: Last measurement and current time (2 pages)
   display2.clearDisplay();
   display2.setTextSize(1);
-  display2.setCursor(0, 0);
-  display2.println("LAST MEASUREMENT");
-  display2.setTextSize(1);
-  display2.setCursor(0, 12);
-  if (lastMeasurement > 0) {
-    display2.printf("%.3f", lastMeasurement);
-  } else {
-    display2.print("--");
-  }
-  display2.setTextSize(1);
-  display2.setCursor(0, 28);
-  display2.println("CURRENT TIME");
-  display2.setCursor(0, 36);
-  display2.printf("%02d:%02d:%02d %02d/%02d", 
-    now.hour(), 
-    now.minute(),
-    now.second(),
-    now.day(),
-    now.month());
   
-  // Show detailed measurement status
-  display2.setCursor(0, 55);
-  if (isMeasuring) {
-    switch (measurementState) {
-      case EMPTYING_INITIAL:
-        display2.print("PREPARING...");
-        break;
-      case FILLING:
-        display2.print("FILLING...");
-        break;
-      case WAITING_TO_SETTLE:
-        display2.print("SETTLING...");
-        break;
-      case MEASURING:
-        display2.printf("MEASURING %d/%d", measurementCount, config.measurementDuration);
-        break;
-      case EMPTYING_FINAL:
-        display2.print("EMPTYING...");
-        break;
-      default:
-        display2.print("MEASURING...");
+  if (displayPage == 0) {
+    // Page 0: Last measurement
+    display2.setCursor(0, 0);
+    display2.println("LAST MEASUREMENT");
+    display2.setCursor(0, 16);
+    display2.setTextSize(2); // Larger text for the value
+    if (lastMeasurement > 0) {
+      display2.printf("%.3f", lastMeasurement);
+    } else {
+      display2.print("--");
     }
   } else {
-    display2.print("READY");
+    // Page 1: Current time and status
+    display2.setCursor(0, 0);
+    display2.println("CURRENT TIME");
+    display2.setCursor(0, 12);
+    display2.printf("%02d:%02d:%02d %02d/%02d", 
+      now.hour(), 
+      now.minute(),
+      now.second(),
+      now.day(),
+      now.month());
+    
+    // Show measurement status on second line
+    display2.setCursor(0, 20);
+    if (isMeasuring) {
+      switch (measurementState) {
+        case EMPTYING_INITIAL:
+          display2.print("PREPARING");
+          break;
+        case FILLING:
+          display2.print("FILLING");
+          break;
+        case WAITING_TO_SETTLE:
+          display2.print("SETTLING");
+          break;
+        case MEASURING:
+          display2.printf("MEAS %d/%d", measurementCount, config.measurementDuration);
+          break;
+        case EMPTYING_FINAL:
+          display2.print("EMPTYING");
+          break;
+        default:
+          display2.print("MEASURING");
+      }
+    } else {
+      display2.print("READY");
+    }
   }
-  
   display2.display();
 }
 
