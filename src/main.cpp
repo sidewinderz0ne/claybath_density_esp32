@@ -70,10 +70,10 @@ int validReadings = 0;
 int measurementCount = 0;
 unsigned long lastAngleReadTime = 0;
 
-// Configuration structure
+// Updated Configuration structure with angle ranges
 struct Config {
   float desiredDensity = 1.025;
-  int measurementInterval = 30; // minutes (changed from hours)
+  int measurementInterval = 30; // minutes
   int fillDuration = 5; // seconds
   int waitDuration = 60; // seconds
   int measurementDuration = 10; // seconds
@@ -82,6 +82,10 @@ struct Config {
   float calibrationScale = 1.0;
   float lastMeasurementValue = 0.0;
   unsigned long lastMeasurementTime = 0; // Unix timestamp
+  // New angle range settings
+  float targetAngleMin = 40.0; // Minimum target angle
+  float targetAngleMax = 45.0; // Maximum target angle
+  float lastMeasurementAngle = 0.0; // Last measured angle
 } config;
 
 // Global variables
@@ -110,7 +114,7 @@ void handleWebRequests();
 void performMeasurement();
 void controlRelays();
 void updateDisplays();
-void saveMeasurementData(float density, DateTime timestamp);
+void saveMeasurementData(float density, float angle, DateTime timestamp);
 String getMeasurementData();
 void deleteMeasurementData();
 float angleToDensity(float angle);
@@ -371,7 +375,7 @@ void loadConfig() {
       }
       
       config.desiredDensity = doc["desiredDensity"] | 1.025;
-      config.measurementInterval = doc["measurementInterval"] | 2;
+      config.measurementInterval = doc["measurementInterval"] | 30;
       config.fillDuration = doc["fillDuration"] | 5;
       config.waitDuration = doc["waitDuration"] | 60;
       config.measurementDuration = doc["measurementDuration"] | 10;
@@ -380,6 +384,10 @@ void loadConfig() {
       config.calibrationScale = doc["calibrationScale"] | 1.0;
       config.lastMeasurementValue = doc["lastMeasurementValue"] | 0.0;
       config.lastMeasurementTime = doc["lastMeasurementTime"] | 0;
+      // Load new angle range settings
+      config.targetAngleMin = doc["targetAngleMin"] | 40.0;
+      config.targetAngleMax = doc["targetAngleMax"] | 45.0;
+      config.lastMeasurementAngle = doc["lastMeasurementAngle"] | 0.0;
       
       file.close();
       logSerial("Configuration loaded from settings.json");
@@ -387,9 +395,11 @@ void loadConfig() {
       // Update global variables from config
       if (config.lastMeasurementTime > 0) {
         lastMeasurement = config.lastMeasurementValue;
+        currentAngle = config.lastMeasurementAngle;
         lastMeasurementTime = DateTime(config.lastMeasurementTime);
         logSerial("Last measurement restored: " + String(lastMeasurement, 3) + 
-                 " at " + String(lastMeasurementTime.timestamp()));
+                 " (angle: " + String(config.lastMeasurementAngle, 1) + "°) at " + 
+                 String(lastMeasurementTime.timestamp()));
       }
     } else {
       logSerial("Failed to open settings.json, creating new one");
@@ -404,7 +414,7 @@ void loadConfig() {
 void createDefaultConfig() {
   // Reset to default values
   config.desiredDensity = 1.025;
-  config.measurementInterval = 30; // minutes (changed from 2 hours)
+  config.measurementInterval = 30; // minutes
   config.fillDuration = 5;
   config.waitDuration = 60;
   config.measurementDuration = 10;
@@ -413,6 +423,10 @@ void createDefaultConfig() {
   config.calibrationScale = 1.0;
   config.lastMeasurementValue = 0.0;
   config.lastMeasurementTime = 0;
+  // Initialize new angle range settings
+  config.targetAngleMin = 40.0;
+  config.targetAngleMax = 45.0;
+  config.lastMeasurementAngle = 0.0;
   
   // Save the default configuration
   saveConfig();
@@ -431,6 +445,10 @@ void saveConfig() {
   doc["calibrationScale"] = config.calibrationScale;
   doc["lastMeasurementValue"] = config.lastMeasurementValue;
   doc["lastMeasurementTime"] = config.lastMeasurementTime;
+  // Save new angle range settings
+  doc["targetAngleMin"] = config.targetAngleMin;
+  doc["targetAngleMax"] = config.targetAngleMax;
+  doc["lastMeasurementAngle"] = config.lastMeasurementAngle;
   
   File file = LittleFS.open("/settings.json", "w");
   if (file) {
@@ -461,6 +479,7 @@ void setupWebServer() {
     doc["currentDensity"] = currentDensity;
     doc["lastMeasurement"] = lastMeasurement;
     doc["lastMeasurementTime"] = config.lastMeasurementTime;
+    doc["lastMeasurementAngle"] = config.lastMeasurementAngle;
     doc["nextMeasurementTime"] = nextMeasurementTime.unixtime() > 0 ? nextMeasurementTime.unixtime() : 0;
     doc["isMeasuring"] = isMeasuring;
     doc["isManualMode"] = isManualMode;
@@ -526,6 +545,10 @@ void setupWebServer() {
     doc["calibrationScale"] = config.calibrationScale;
     doc["lastMeasurementValue"] = config.lastMeasurementValue;
     doc["lastMeasurementTime"] = config.lastMeasurementTime;
+    // Include new angle range settings
+    doc["targetAngleMin"] = config.targetAngleMin;
+    doc["targetAngleMax"] = config.targetAngleMax;
+    doc["lastMeasurementAngle"] = config.lastMeasurementAngle;
     
     String response;
     serializeJson(doc, response);
@@ -546,6 +569,13 @@ void setupWebServer() {
       config.emptyDuration = doc["emptyDuration"];
       config.calibrationOffset = doc["calibrationOffset"];
       config.calibrationScale = doc["calibrationScale"];
+      // Handle new angle range settings
+      if (doc.containsKey("targetAngleMin")) {
+        config.targetAngleMin = doc["targetAngleMin"];
+      }
+      if (doc.containsKey("targetAngleMax")) {
+        config.targetAngleMax = doc["targetAngleMax"];
+      }
       
       saveConfig();
       logSerial("Configuration updated via web interface");
@@ -795,8 +825,9 @@ void updateMeasurementState() {
             lastMeasurement = currentDensity;
             lastMeasurementTime = rtc.now();
             
-            // Update config with new measurement data
+            // Update config with new measurement data including angle
             config.lastMeasurementValue = currentDensity;
+            config.lastMeasurementAngle = currentAngle;
             config.lastMeasurementTime = lastMeasurementTime.unixtime();
             saveConfig(); // Save the measurement data to settings
             
@@ -806,8 +837,8 @@ void updateMeasurementState() {
                      ", Valid readings: " + String(validReadings) + "/" + 
                      String(config.measurementDuration));
             
-            // Save measurement data
-            saveMeasurementData(currentDensity, lastMeasurementTime);
+            // Save measurement data including angle
+            saveMeasurementData(currentDensity, currentAngle, lastMeasurementTime);
           } else {
             logSerial("No valid readings obtained during measurement");
           }
@@ -852,7 +883,7 @@ void controlRelays() {
   }
 }
 
-// Replace the updateDisplays() function with this updated version
+// Updated updateDisplays function with angle information
 void updateDisplays() {
   DateTime now = rtc.now();
   
@@ -862,17 +893,17 @@ void updateDisplays() {
     lastDisplayUpdate = millis();
   }
   
-  // Display 1: Desired density and next measurement time (2 pages)
+  // Display 1: Target angle range and next measurement time (2 pages)
   display1.clearDisplay();
   display1.setTextSize(1);
   
   if (displayPage == 0) {
-    // Page 0: Desired density
+    // Page 0: Target angle range
     display1.setCursor(0, 0);
-    display1.println("DESIRED DENSITY");
+    display1.println("TARGET ANGLE");
     display1.setCursor(0, 16);
-    display1.setTextSize(2); // Larger text for the value
-    display1.printf("%.3f", config.desiredDensity);
+    display1.setTextSize(2); // Larger text for the values
+    display1.printf("%.0f-%.0f°", config.targetAngleMin, config.targetAngleMax);
   } else {
     // Page 1: Next measurement time
     display1.setCursor(0, 0);
@@ -893,20 +924,20 @@ void updateDisplays() {
   }
   display1.display();
   
-  // Display 2: Last measurement and current time (2 pages)
+  // Display 2: Last measurement angle and current time (2 pages)
   display2.clearDisplay();
   display2.setTextSize(1);
   
   if (displayPage == 0) {
-    // Page 0: Last measurement
+    // Page 0: Last measurement angle
     display2.setCursor(0, 0);
     display2.println("LAST MEASUREMENT");
     display2.setCursor(0, 16);
     display2.setTextSize(2); // Larger text for the value
-    if (lastMeasurement > 0) {
-      display2.printf("%.3f", lastMeasurement);
+    if (config.lastMeasurementAngle > 0) {
+      display2.printf("%.1f°", config.lastMeasurementAngle);
     } else {
-      display2.print("--");
+      display2.print("--°");
     }
   } else {
     // Page 1: Current time and status
@@ -949,7 +980,8 @@ void updateDisplays() {
   display2.display();
 }
 
-void saveMeasurementData(float density, DateTime timestamp) {
+// Updated saveMeasurementData function to include angle
+void saveMeasurementData(float density, float angle, DateTime timestamp) {
   String filename = "/data_" + String(timestamp.year()) + 
                    String(timestamp.month()) + 
                    String(timestamp.day()) + ".csv";
@@ -959,7 +991,7 @@ void saveMeasurementData(float density, DateTime timestamp) {
     file.printf("%04d-%02d-%02d %02d:%02d:%02d,%.4f,%.2f\n",
       timestamp.year(), timestamp.month(), timestamp.day(),
       timestamp.hour(), timestamp.minute(), timestamp.second(),
-      density, currentAngle);
+      density, angle);
     file.close();
     logSerial("Measurement data saved to " + filename);
   } else {

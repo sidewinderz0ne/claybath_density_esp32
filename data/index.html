@@ -110,6 +110,12 @@
             padding: 8px;
         }
         
+        .angle-range-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
         .btn {
             background: #3498db;
             color: white;
@@ -325,6 +331,10 @@
             .grid {
                 grid-template-columns: 1fr;
             }
+            
+            .angle-range-inputs {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -344,7 +354,7 @@
                 <div class="status-grid">
                     <div class="status-item">
                         <div class="label">Current Angle</div>
-                        <div class="value" id="currentAngle">--</div>
+                        <div class="value" id="currentAngle">--°</div>
                     </div>
                     <div class="status-item">
                         <div class="label">Current Density</div>
@@ -353,6 +363,10 @@
                     <div class="status-item">
                         <div class="label">Last Measurement</div>
                         <div class="value" id="lastMeasurement">--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Last Angle</div>
+                        <div class="value" id="lastAngle">--°</div>
                     </div>
                     <div class="status-item">
                         <div class="label">Next Measurement</div>
@@ -380,6 +394,20 @@
                     <label for="desiredDensity">Desired Density</label>
                     <input type="number" id="desiredDensity" step="0.001" value="1.025">
                     <div class="help-text">Target density value for the claybath (typically 1.020-1.030)</div>
+                </div>
+                <div class="form-group">
+                    <label>Target Angle Range</label>
+                    <div class="angle-range-inputs">
+                        <div>
+                            <label for="targetAngleMin">Minimum (°)</label>
+                            <input type="number" id="targetAngleMin" step="0.1" value="40.0">
+                        </div>
+                        <div>
+                            <label for="targetAngleMax">Maximum (°)</label>
+                            <input type="number" id="targetAngleMax" step="0.1" value="45.0">
+                        </div>
+                    </div>
+                    <div class="help-text">Target angle range for optimal claybath density (displayed on OLED)</div>
                 </div>
                 <div class="form-group">
                     <label for="measurementInterval">Measurement Interval (minutes)</label>
@@ -595,12 +623,12 @@
         // Fallback simulation for development
         function simulateSerialData() {
             const messages = [
-                'MPU6050 reading: Angle = 12.34°',
+                'MPU6050 reading: Angle = 42.5°',
                 'Measurement cycle started',
                 'Fill solenoid activated',
                 'Waiting for liquid to settle...',
                 'Taking measurements...',
-                'Density calculated: 1.025',
+                'Angle calculated: 43.2°',
                 'Empty solenoid activated',
                 'Measurement complete'
             ];
@@ -778,10 +806,15 @@
                 document.getElementById('calibrationOffset').value = config.calibrationOffset;
                 document.getElementById('calibrationScale').value = config.calibrationScale;
                 
+                // Load angle range settings
+                document.getElementById('targetAngleMin').value = config.targetAngleMin || 40.0;
+                document.getElementById('targetAngleMax').value = config.targetAngleMax || 45.0;
+                
                 // Show last measurement info if available
                 if (config.lastMeasurementTime > 0) {
                     addSerialMessage('Last measurement loaded: ' + config.lastMeasurementValue.toFixed(3) + 
-                                   ' at ' + formatDateTime(config.lastMeasurementTime));
+                                   ' (angle: ' + (config.lastMeasurementAngle || 0).toFixed(1) + '°) at ' + 
+                                   formatDateTime(config.lastMeasurementTime));
                 }
             } catch (error) {
                 console.error('Error loading settings:', error);
@@ -798,7 +831,10 @@
                 measurementDuration: parseInt(document.getElementById('measurementDuration').value),
                 emptyDuration: parseInt(document.getElementById('emptyDuration').value),
                 calibrationOffset: parseFloat(document.getElementById('calibrationOffset').value),
-                calibrationScale: parseFloat(document.getElementById('calibrationScale').value)
+                calibrationScale: parseFloat(document.getElementById('calibrationScale').value),
+                // Include angle range settings
+                targetAngleMin: parseFloat(document.getElementById('targetAngleMin').value),
+                targetAngleMax: parseFloat(document.getElementById('targetAngleMax').value)
             };
             
             try {
@@ -812,7 +848,8 @@
                 
                 if (response.ok) {
                     alert('Settings saved successfully!');
-                    addSerialMessage('Settings updated');
+                    addSerialMessage('Settings updated including angle range: ' + 
+                                   config.targetAngleMin + '° - ' + config.targetAngleMax + '°');
                 } else {
                     alert('Error saving settings');
                 }
@@ -859,6 +896,13 @@
                 document.getElementById('currentAngle').textContent = status.currentAngle.toFixed(2) + '°';
                 document.getElementById('currentDensity').textContent = status.currentDensity.toFixed(3);
                 document.getElementById('lastMeasurement').textContent = status.lastMeasurement.toFixed(3);
+                
+                // Display last measurement angle
+                if (status.lastMeasurementAngle !== undefined && status.lastMeasurementAngle > 0) {
+                    document.getElementById('lastAngle').textContent = status.lastMeasurementAngle.toFixed(1) + '°';
+                } else {
+                    document.getElementById('lastAngle').textContent = '--°';
+                }
                 
                 // Handle next measurement display
                 if (status.hasScheduledMeasurement && status.nextMeasurementTime > 0) {
