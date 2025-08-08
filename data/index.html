@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,112 +11,113 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
             color: #333;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
-        
+
         h1 {
             text-align: center;
             color: #2c3e50;
             margin-bottom: 30px;
         }
-        
+
         .card {
             background: white;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        
+
         .card h2 {
             color: #34495e;
             margin-bottom: 15px;
             border-bottom: 2px solid #3498db;
             padding-bottom: 5px;
         }
-        
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
         }
-        
+
         .full-width {
             grid-column: 1 / -1;
         }
-        
+
         .status-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
         }
-        
+
         .status-item {
             background: #ecf0f1;
             padding: 15px;
             border-radius: 5px;
             text-align: center;
         }
-        
+
         .status-item .label {
             font-weight: bold;
             color: #7f8c8d;
             font-size: 0.9em;
         }
-        
+
         .status-item .value {
             font-size: 1.4em;
             color: #2c3e50;
             margin-top: 5px;
         }
-        
+
         .form-group {
             margin-bottom: 15px;
             position: relative;
         }
-        
+
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
             color: #555;
         }
-        
+
         .help-text {
             font-size: 0.85em;
             color: #7f8c8d;
             font-style: italic;
             margin-top: 3px;
         }
-        
-        input, select {
+
+        input,
+        select {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
         }
-        
+
         input[type="datetime-local"] {
             padding: 8px;
         }
-        
+
         .angle-range-inputs {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
-        
+
         .btn {
             background: #3498db;
             color: white;
@@ -127,42 +129,42 @@
             margin-right: 10px;
             margin-bottom: 10px;
         }
-        
+
         .btn:hover {
             background: #2980b9;
         }
-        
+
         .btn.danger {
             background: #e74c3c;
         }
-        
+
         .btn.danger:hover {
             background: #c0392b;
         }
-        
+
         .btn.success {
             background: #27ae60;
         }
-        
+
         .btn.success:hover {
             background: #219a52;
         }
-        
+
         .btn.warning {
             background: #f39c12;
         }
-        
+
         .btn.warning:hover {
             background: #d68910;
         }
-        
+
         .control-buttons {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
             margin-top: 10px;
         }
-        
+
         .relay-control {
             display: flex;
             align-items: center;
@@ -172,20 +174,20 @@
             border-radius: 4px;
             margin-bottom: 10px;
         }
-        
+
         .toggle-switch {
             position: relative;
             display: inline-block;
             width: 60px;
             height: 34px;
         }
-        
+
         .toggle-switch input {
             opacity: 0;
             width: 0;
             height: 0;
         }
-        
+
         .slider {
             position: absolute;
             cursor: pointer;
@@ -197,7 +199,7 @@
             transition: .4s;
             border-radius: 34px;
         }
-        
+
         .slider:before {
             position: absolute;
             content: "";
@@ -209,20 +211,20 @@
             transition: .4s;
             border-radius: 50%;
         }
-        
-        input:checked + .slider {
+
+        input:checked+.slider {
             background-color: #2196F3;
         }
-        
-        input:checked + .slider:before {
+
+        input:checked+.slider:before {
             transform: translateX(26px);
         }
-        
+
         .measuring {
             background: #e8f5e8 !important;
             border-left: 4px solid #27ae60;
         }
-        
+
         .current-time {
             background: #3498db;
             color: white;
@@ -233,7 +235,7 @@
             font-size: 1.2em;
             font-weight: bold;
         }
-        
+
         .file-list {
             max-height: 300px;
             overflow-y: auto;
@@ -241,7 +243,7 @@
             border-radius: 4px;
             background: #f8f9fa;
         }
-        
+
         .file-item {
             display: flex;
             justify-content: space-between;
@@ -249,42 +251,42 @@
             padding: 10px;
             border-bottom: 1px solid #eee;
         }
-        
+
         .file-item:last-child {
             border-bottom: none;
         }
-        
+
         .file-info {
             flex: 1;
         }
-        
+
         .file-name {
             font-weight: bold;
             color: #2c3e50;
         }
-        
+
         .file-size {
             font-size: 0.85em;
             color: #7f8c8d;
         }
-        
+
         .file-actions {
             display: flex;
             gap: 5px;
         }
-        
+
         .btn-small {
             padding: 5px 10px;
             font-size: 12px;
         }
-        
+
         .serial-monitor {
             background: #2c3e50;
             color: #ecf0f1;
             border-radius: 4px;
             overflow: hidden;
         }
-        
+
         .serial-header {
             background: #34495e;
             padding: 10px;
@@ -292,12 +294,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .serial-stats {
             font-size: 0.9em;
             color: #95a5a6;
         }
-        
+
         .serial-output {
             height: 300px;
             overflow-y: auto;
@@ -308,45 +310,46 @@
             white-space: pre-wrap;
             background: #2c3e50;
         }
-        
+
         .serial-input {
             padding: 10px;
             background: #34495e;
             display: flex;
             gap: 10px;
         }
-        
+
         .serial-input input {
             flex: 1;
             background: #2c3e50;
             color: #ecf0f1;
             border: 1px solid #4a6741;
         }
-        
+
         .serial-input input::placeholder {
             color: #95a5a6;
         }
-        
+
         @media (max-width: 768px) {
             .grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .angle-range-inputs {
                 grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Claybath Density Measurement System</h1>
-        
+
         <!-- Current Time Display -->
         <div class="current-time" id="currentTime">
             Loading current time...
         </div>
-        
+
         <div class="grid">
             <!-- Status Panel -->
             <div class="card">
@@ -378,7 +381,7 @@
                     </div>
                 </div>
                 <div class="help-text" style="margin-bottom: 10px;">
-                    Automatic measurements are scheduled based on the last measurement time + interval. 
+                    Automatic measurements are scheduled based on the last measurement time + interval.
                     If no measurement was taken today, no automatic measurement will be scheduled.
                 </div>
                 <div class="control-buttons">
@@ -386,7 +389,33 @@
                     <button class="btn" onclick="refreshStatus()">Refresh Status</button>
                 </div>
             </div>
-            
+
+            <!-- Serial Monitor - Full Width -->
+            <div class="card full-width">
+                <h2>Serial Monitor</h2>
+                <div class="serial-monitor">
+                    <div class="serial-header">
+                        <span>System Debug Output</span>
+                        <div class="serial-stats">
+                            <span id="serialStats">Messages: 0/100</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-small" onclick="clearSerial()">Clear</button>
+                            <button class="btn btn-small" id="serialToggle" onclick="toggleSerial()">Pause</button>
+                            <button class="btn btn-small" onclick="refreshSerial()">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="serial-output" id="serialOutput">
+                        Serial monitor starting...\n
+                    </div>
+                    <div class="serial-input">
+                        <input type="text" id="serialInput" placeholder="Enter command..."
+                            onkeypress="handleSerialInput(event)">
+                        <button class="btn btn-small" onclick="sendSerialCommand()">Send</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Settings Panel -->
             <div class="card">
                 <h2>Settings</h2>
@@ -437,7 +466,7 @@
                 <button class="btn success" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
-        
+
         <div class="grid">
             <!-- Calibration Panel -->
             <div class="card">
@@ -454,7 +483,7 @@
                 </div>
                 <button class="btn success" onclick="saveCalibration()">Save Calibration</button>
             </div>
-            
+
             <!-- Manual Control Panel -->
             <div class="card">
                 <h2>Manual Control</h2>
@@ -466,27 +495,29 @@
                     </label>
                 </div>
                 <div class="help-text">Controls the solenoid valve that fills the measurement chamber</div>
-                
+
                 <div class="relay-control">
                     <span>Empty Solenoid</span>
                     <label class="toggle-switch">
-                        <input type="checkbox" id="emptySolenoid" onchange="controlRelay('empty_solenoid', this.checked)">
+                        <input type="checkbox" id="emptySolenoid"
+                            onchange="controlRelay('empty_solenoid', this.checked)">
                         <span class="slider"></span>
                     </label>
                 </div>
                 <div class="help-text">Controls the solenoid valve that empties the measurement chamber</div>
-                
+
                 <div class="relay-control">
                     <span>Measuring Light (OFF=Red, ON=Green)</span>
                     <label class="toggle-switch">
-                        <input type="checkbox" id="measuringRelay" onchange="controlRelay('measuring_relay', this.checked)">
+                        <input type="checkbox" id="measuringRelay"
+                            onchange="controlRelay('measuring_relay', this.checked)">
                         <span class="slider"></span>
                     </label>
                 </div>
                 <div class="help-text">Status indicator light - Red when idle, Green when measuring</div>
             </div>
         </div>
-        
+
         <div class="grid">
             <!-- Date/Time Settings -->
             <div class="card">
@@ -501,7 +532,7 @@
                     <button class="btn" onclick="setCurrentDateTime()">Use Current Time</button>
                 </div>
             </div>
-            
+
             <!-- Data Management -->
             <div class="card">
                 <h2>Data Management</h2>
@@ -509,46 +540,22 @@
                     <div class="label">Last Measurement Time</div>
                     <div class="value" id="lastMeasurementTime">--</div>
                 </div>
-                
+
                 <h3 style="margin-bottom: 10px;">Data Files</h3>
                 <div class="help-text" style="margin-bottom: 10px;">
-                    Measurement data is automatically saved to daily CSV files. Each file contains timestamp, density, and angle measurements.
+                    Measurement data is automatically saved to daily CSV files. Each file contains timestamp, density,
+                    and angle measurements.
                 </div>
                 <div class="file-list" id="fileList">
                     <div style="padding: 20px; text-align: center; color: #7f8c8d;">
                         Loading files...
                     </div>
                 </div>
-                
+
                 <div class="control-buttons" style="margin-top: 15px;">
                     <button class="btn" onclick="refreshFileList()">Refresh Files</button>
                     <button class="btn" onclick="downloadAllData()">Download All Data</button>
                     <button class="btn danger" onclick="deleteAllData()">Delete All Data</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Serial Monitor - Full Width -->
-        <div class="card full-width">
-            <h2>Serial Monitor</h2>
-            <div class="serial-monitor">
-                <div class="serial-header">
-                    <span>System Debug Output</span>
-                    <div class="serial-stats">
-                        <span id="serialStats">Messages: 0/100</span>
-                    </div>
-                    <div>
-                        <button class="btn btn-small" onclick="clearSerial()">Clear</button>
-                        <button class="btn btn-small" id="serialToggle" onclick="toggleSerial()">Pause</button>
-                        <button class="btn btn-small" onclick="refreshSerial()">Refresh</button>
-                    </div>
-                </div>
-                <div class="serial-output" id="serialOutput">
-                    Serial monitor starting...\n
-                </div>
-                <div class="serial-input">
-                    <input type="text" id="serialInput" placeholder="Enter command..." onkeypress="handleSerialInput(event)">
-                    <button class="btn btn-small" onclick="sendSerialCommand()">Send</button>
                 </div>
             </div>
         </div>
@@ -560,34 +567,34 @@
         let serialInterval;
         let serialPaused = false;
         let lastSerialUpdate = 0;
-        
+
         // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             loadSettings();
             refreshStatus();
             refreshFileList();
-            
+
             // Auto-refresh status every 5 seconds
             statusInterval = setInterval(refreshStatus, 5000);
-            
+
             // Update current time every second
             timeInterval = setInterval(updateCurrentTime, 1000);
             updateCurrentTime();
-            
+
             // Start real serial monitoring
             startSerialMonitoring();
-            
+
             // Set current datetime in picker
             setCurrentDateTime();
         });
-        
+
         // Update current time display
         function updateCurrentTime() {
             const now = new Date();
             const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
             document.getElementById('currentTime').textContent = 'Current Time: ' + timeString;
         }
-        
+
         // Real serial monitoring functions
         function startSerialMonitoring() {
             // Start monitoring real serial output from ESP32
@@ -597,29 +604,44 @@
                 }
             }, 2000); // Check every 2 seconds
         }
-        
-        // Refresh serial output from ESP32
+
+        function updateSerialMonitor() {
+            fetch('/api/serial')
+                .then(response => response.json())
+                .then(data => {
+                    const output = document.getElementById('serialOutput');
+                    output.textContent = data.output;
+                    output.scrollTop = output.scrollHeight;
+
+                    // Update stats
+                    const stats = document.getElementById('serialStats');
+                    stats.textContent = `Messages: ${data.totalMessages}/${data.bufferSize}`;
+                })
+                .catch(error => {
+                    console.error('Error fetching serial data:', error);
+                });
+        }
+
+        // Update the existing refreshSerial function to use the new endpoint
         async function refreshSerial() {
             try {
                 const response = await fetch('/api/serial');
                 const data = await response.json();
-                
+
                 if (data.output !== undefined) {
                     const output = document.getElementById('serialOutput');
                     output.textContent = data.output;
                     output.scrollTop = output.scrollHeight;
-                    
+
                     // Update stats
                     const stats = document.getElementById('serialStats');
                     stats.textContent = `Messages: ${data.totalMessages || 0}/${data.bufferSize || 100}`;
                 }
             } catch (error) {
                 console.error('Error fetching serial data:', error);
-                // Fallback to simulated data if real API fails
-                simulateSerialData();
             }
         }
-        
+
         // Fallback simulation for development
         function simulateSerialData() {
             const messages = [
@@ -632,30 +654,31 @@
                 'Empty solenoid activated',
                 'Measurement complete'
             ];
-            
+
             const randomMessage = messages[Math.floor(Math.random() * messages.length)];
             const timestamp = new Date().toLocaleTimeString();
             addSerialMessage(`[${timestamp}] ${randomMessage}`);
         }
-        
+
         function addSerialMessage(message) {
             const output = document.getElementById('serialOutput');
             output.textContent += message + '\n';
             output.scrollTop = output.scrollHeight;
-            
+
             // Limit output to last 1000 lines
             const lines = output.textContent.split('\n');
             if (lines.length > 1000) {
                 output.textContent = lines.slice(-1000).join('\n');
             }
         }
-        
+
+        // Enhanced clear function
         async function clearSerial() {
             try {
                 const response = await fetch('/api/serial/clear', {
                     method: 'POST'
                 });
-                
+
                 if (response.ok) {
                     document.getElementById('serialOutput').textContent = '';
                     document.getElementById('serialStats').textContent = 'Messages: 0/100';
@@ -664,24 +687,22 @@
                 }
             } catch (error) {
                 console.error('Error clearing serial buffer:', error);
-                // Fallback to local clear
-                document.getElementById('serialOutput').textContent = '';
             }
         }
-        
+
         function toggleSerial() {
             serialPaused = !serialPaused;
             const button = document.getElementById('serialToggle');
             button.textContent = serialPaused ? 'Resume' : 'Pause';
             button.className = serialPaused ? 'btn btn-small success' : 'btn btn-small';
         }
-        
+
         function handleSerialInput(event) {
             if (event.key === 'Enter') {
                 sendSerialCommand();
             }
         }
-        
+
         function sendSerialCommand() {
             const input = document.getElementById('serialInput');
             const command = input.value.trim();
@@ -695,7 +716,40 @@
                 input.value = '';
             }
         }
-        
+
+        // FIXED: Timezone handling functions
+        // Get timezone offset in seconds (ESP32 stores in UTC, convert to local time)
+        function getTimezoneOffsetSeconds() {
+            const now = new Date();
+            return now.getTimezoneOffset() * -60; // Convert minutes to seconds, invert sign
+        }
+
+        // FIXED: Updated formatDateTime function with timezone correction
+        function formatDateTime(timestamp) {
+            if (!timestamp || timestamp === 0) return '--';
+            
+            // ESP32 stores in UTC, but we want to display in local timezone
+            const utcDate = new Date(timestamp * 1000);
+            
+            // Convert to local timezone string
+            return utcDate.toLocaleDateString() + ' ' + utcDate.toLocaleTimeString();
+        }
+
+        // Alternative function for more precise timezone handling
+        function formatDateTimeWithOffset(timestamp) {
+            if (!timestamp || timestamp === 0) return '--';
+            
+            // Create date from UTC timestamp
+            const utcDate = new Date(timestamp * 1000);
+
+            // Subtract 8 hours (in ms)
+            utcDate.setHours(utcDate.getHours() - 7);
+
+            // Convert to local timezone string
+            return utcDate.toLocaleDateString() + ' ' + utcDate.toLocaleTimeString();
+        }
+
+
         // File management functions
         async function refreshFileList() {
             try {
@@ -704,19 +758,19 @@
                 displayFileList(data.files || []);
             } catch (error) {
                 console.error('Error refreshing file list:', error);
-                document.getElementById('fileList').innerHTML = 
+                document.getElementById('fileList').innerHTML =
                     '<div style="padding: 20px; text-align: center; color: #e74c3c;">Error loading files</div>';
             }
         }
-        
+
         function displayFileList(files) {
             const fileList = document.getElementById('fileList');
-            
+
             if (files.length === 0) {
                 fileList.innerHTML = '<div style="padding: 20px; text-align: center; color: #7f8c8d;">No files found</div>';
                 return;
             }
-            
+
             fileList.innerHTML = files.map(file => {
                 const size = formatFileSize(file.size);
                 const date = formatDate(file.lastModified);
@@ -734,7 +788,7 @@
                 `;
             }).join('');
         }
-        
+
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
@@ -742,13 +796,14 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
-        
+
         function formatDate(timestamp) {
             if (!timestamp) return 'Unknown';
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString();
         }
-        
+
+        // FIXED: Download file function
         async function downloadFile(filename) {
             try {
                 const response = await fetch(`/api/file?name=${encodeURIComponent(filename)}`);
@@ -770,14 +825,14 @@
                 alert('Error downloading file');
             }
         }
-        
+
         async function deleteFile(filename) {
             if (confirm(`Are you sure you want to delete ${filename}?`)) {
                 try {
                     const response = await fetch(`/api/file?name=${encodeURIComponent(filename)}`, {
                         method: 'DELETE'
                     });
-                    
+
                     if (response.ok) {
                         alert(`${filename} deleted successfully`);
                         refreshFileList();
@@ -790,13 +845,13 @@
                 }
             }
         }
-        
+
         // Load settings from device
         async function loadSettings() {
             try {
                 const response = await fetch('/api/config');
                 const config = await response.json();
-                
+
                 document.getElementById('desiredDensity').value = config.desiredDensity;
                 document.getElementById('measurementInterval').value = config.measurementInterval;
                 document.getElementById('fillDuration').value = config.fillDuration;
@@ -805,22 +860,22 @@
                 document.getElementById('emptyDuration').value = config.emptyDuration;
                 document.getElementById('calibrationOffset').value = config.calibrationOffset;
                 document.getElementById('calibrationScale').value = config.calibrationScale;
-                
+
                 // Load angle range settings
                 document.getElementById('targetAngleMin').value = config.targetAngleMin || 40.0;
                 document.getElementById('targetAngleMax').value = config.targetAngleMax || 45.0;
-                
+
                 // Show last measurement info if available
                 if (config.lastMeasurementTime > 0) {
-                    addSerialMessage('Last measurement loaded: ' + config.lastMeasurementValue.toFixed(3) + 
-                                   ' (angle: ' + (config.lastMeasurementAngle || 0).toFixed(1) + '°) at ' + 
-                                   formatDateTime(config.lastMeasurementTime));
+                    addSerialMessage('Last measurement loaded: ' + config.lastMeasurementValue.toFixed(3) +
+                        ' (angle: ' + (config.lastMeasurementAngle || 0).toFixed(1) + '°) at ' +
+                        formatDateTime(config.lastMeasurementTime));
                 }
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
         }
-        
+
         // Save settings to device
         async function saveSettings() {
             const config = {
@@ -836,7 +891,7 @@
                 targetAngleMin: parseFloat(document.getElementById('targetAngleMin').value),
                 targetAngleMax: parseFloat(document.getElementById('targetAngleMax').value)
             };
-            
+
             try {
                 const response = await fetch('/api/config', {
                     method: 'POST',
@@ -845,11 +900,11 @@
                     },
                     body: JSON.stringify(config)
                 });
-                
+
                 if (response.ok) {
                     alert('Settings saved successfully!');
-                    addSerialMessage('Settings updated including angle range: ' + 
-                                   config.targetAngleMin + '° - ' + config.targetAngleMax + '°');
+                    addSerialMessage('Settings updated including angle range: ' +
+                        config.targetAngleMin + '° - ' + config.targetAngleMax + '°');
                 } else {
                     alert('Error saving settings');
                 }
@@ -858,14 +913,14 @@
                 alert('Error saving settings');
             }
         }
-        
+
         // Save calibration settings
         async function saveCalibration() {
             const config = {
                 calibrationOffset: parseFloat(document.getElementById('calibrationOffset').value),
                 calibrationScale: parseFloat(document.getElementById('calibrationScale').value)
             };
-            
+
             try {
                 const response = await fetch('/api/config', {
                     method: 'POST',
@@ -874,7 +929,7 @@
                     },
                     body: JSON.stringify(config)
                 });
-                
+
                 if (response.ok) {
                     alert('Calibration saved successfully!');
                     addSerialMessage('Calibration updated');
@@ -886,41 +941,41 @@
                 alert('Error saving calibration');
             }
         }
-        
-        // Refresh system status
+
+        // FIXED: Refresh system status with timezone handling
         async function refreshStatus() {
             try {
                 const response = await fetch('/api/status');
                 const status = await response.json();
-                
+
                 document.getElementById('currentAngle').textContent = status.currentAngle.toFixed(2) + '°';
                 document.getElementById('currentDensity').textContent = status.currentDensity.toFixed(3);
                 document.getElementById('lastMeasurement').textContent = status.lastMeasurement.toFixed(3);
-                
+
                 // Display last measurement angle
                 if (status.lastMeasurementAngle !== undefined && status.lastMeasurementAngle > 0) {
                     document.getElementById('lastAngle').textContent = status.lastMeasurementAngle.toFixed(1) + '°';
                 } else {
                     document.getElementById('lastAngle').textContent = '--°';
                 }
-                
-                // Handle next measurement display
+
+                // Handle next measurement display with timezone correction
                 if (status.hasScheduledMeasurement && status.nextMeasurementTime > 0) {
-                    document.getElementById('nextMeasurement').textContent = formatDateTime(status.nextMeasurementTime);
+                    document.getElementById('nextMeasurement').textContent = formatDateTimeWithOffset(status.nextMeasurementTime);
                 } else {
                     document.getElementById('nextMeasurement').textContent = 'No scheduled measurement';
                 }
-                
-                // Handle last measurement time
+
+                // Handle last measurement time with timezone correction
                 if (status.lastMeasurementTime > 0) {
-                    document.getElementById('lastMeasurementTime').textContent = formatDateTime(status.lastMeasurementTime);
+                    document.getElementById('lastMeasurementTime').textContent = formatDateTimeWithOffset(status.lastMeasurementTime);
                 } else {
                     document.getElementById('lastMeasurementTime').textContent = 'No previous measurement';
                 }
-                
+
                 const statusElement = document.getElementById('systemStatus');
                 const measuringStatus = document.getElementById('measuringStatus');
-                
+
                 if (status.isMeasuring) {
                     statusElement.textContent = 'Measuring...';
                     measuringStatus.classList.add('measuring');
@@ -932,14 +987,14 @@
                 console.error('Error refreshing status:', error);
             }
         }
-        
+
         // Start manual measurement
         async function startMeasurement() {
             try {
                 const response = await fetch('/api/measure', {
                     method: 'POST'
                 });
-                
+
                 if (response.ok) {
                     alert('Measurement started!');
                     addSerialMessage('Manual measurement initiated');
@@ -953,7 +1008,7 @@
                 alert('Error starting measurement');
             }
         }
-        
+
         // Control relay
         async function controlRelay(action, state) {
             try {
@@ -967,7 +1022,7 @@
                         state: state
                     })
                 });
-                
+
                 if (response.ok) {
                     addSerialMessage(`${action} ${state ? 'activated' : 'deactivated'}`);
                 } else {
@@ -978,17 +1033,20 @@
                 alert('Error controlling relay');
             }
         }
-        
-        // Set date and time
+
+        // FIXED: Set date and time with proper timezone handling
         async function setDateTime() {
             const datetimeValue = document.getElementById('datetime').value;
             if (!datetimeValue) {
                 alert('Please select a date and time');
                 return;
             }
-            
+
+            // Create local date from input
             const localDate = new Date(datetimeValue);
             
+            // ESP32 expects UTC time, so send the local time as-is since
+            // the ESP32 doesn't handle timezone conversions
             const dateTime = {
                 year: localDate.getFullYear(),
                 month: localDate.getMonth() + 1,
@@ -997,7 +1055,7 @@
                 minute: localDate.getMinutes(),
                 second: localDate.getSeconds()
             };
-            
+
             try {
                 const response = await fetch('/api/datetime', {
                     method: 'POST',
@@ -1006,10 +1064,10 @@
                     },
                     body: JSON.stringify(dateTime)
                 });
-                
+
                 if (response.ok) {
                     alert('Date and time set successfully!');
-                    addSerialMessage(`RTC time set to: ${localDate.toLocaleString()}`);
+                    addSerialMessage(`RTC time set to: ${localDate.toLocaleString()} (local time)`);
                     refreshStatus();
                 } else {
                     alert('Error setting date and time');
@@ -1019,13 +1077,13 @@
                 alert('Error setting date and time');
             }
         }
-        
+
         // Download all measurement data
         async function downloadAllData() {
             try {
                 const response = await fetch('/api/data');
                 const data = await response.text();
-                
+
                 const blob = new Blob([data], { type: 'text/csv' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1035,14 +1093,14 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
-                
+
                 addSerialMessage('All measurement data downloaded');
             } catch (error) {
                 console.error('Error downloading data:', error);
                 alert('Error downloading data');
             }
         }
-        
+
         // Delete all measurement data
         async function deleteAllData() {
             if (confirm('Are you sure you want to delete all measurement data? This cannot be undone.')) {
@@ -1050,7 +1108,7 @@
                     const response = await fetch('/api/data', {
                         method: 'DELETE'
                     });
-                    
+
                     if (response.ok) {
                         alert('All measurement data deleted successfully!');
                         addSerialMessage('All measurement data deleted');
@@ -1064,14 +1122,7 @@
                 }
             }
         }
-        
-        // Format datetime for display
-        function formatDateTime(timestamp) {
-            if (!timestamp) return '--';
-            const date = new Date(timestamp * 1000);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-        }
-        
+
         // Set current date and time in form
         function setCurrentDateTime() {
             const now = new Date();
@@ -1080,17 +1131,18 @@
             const day = String(now.getDate()).padStart(2, '0');
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
-            
+
             const datetimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
             document.getElementById('datetime').value = datetimeString;
         }
-        
+
         // Cleanup intervals when page unloads
-        window.addEventListener('beforeunload', function() {
+        window.addEventListener('beforeunload', function () {
             if (statusInterval) clearInterval(statusInterval);
             if (timeInterval) clearInterval(timeInterval);
             if (serialInterval) clearInterval(serialInterval);
         });
     </script>
 </body>
+
 </html>

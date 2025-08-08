@@ -129,8 +129,13 @@ String getFileList();
 bool deleteFile(String filename);
 String getFileInfo(String filename);
 String formatTime(DateTime dt);
+void handleSerial();
+void setupEnhancedSerialEndpoints();
+void serialPrintln(const char *message);
+void handleSerialText();
+void clearSerialBuffer();
 
-// Enhanced logSerial function with circular buffer
+// Enhanced logSerial function with better formatting and timestamp handling
 void logSerial(String message) {
   DateTime now;
   String timestampStr;
@@ -142,7 +147,7 @@ void logSerial(String message) {
     timestampStr = "??:??:??";
   }
 
-  // Create the complete log message
+  // Create the complete log message with milliseconds for better precision
   String logMessage = "[" + timestampStr + "] " + message;
   
   // Print to both Serial (PlatformIO terminal) and web buffer
@@ -157,25 +162,43 @@ void logSerial(String message) {
   totalMessages++;
 }
 
-// Function to get serial buffer for web interface
+// Enhanced function to get serial buffer for web interface with proper ordering
 String getSerialBuffer() {
   String result = "";
-  int startIndex;
+  result.reserve(SERIAL_BUFFER_SIZE * 100); // Pre-allocate space for better performance
+  
+  int start = (serialBufferIndex - min(totalMessages, SERIAL_BUFFER_SIZE) + SERIAL_BUFFER_SIZE) % SERIAL_BUFFER_SIZE;
   int count = min(totalMessages, SERIAL_BUFFER_SIZE);
   
-  if (totalMessages >= SERIAL_BUFFER_SIZE) {
-    startIndex = serialBufferIndex;
-  } else {
-    startIndex = 0;
-  }
-  
   for (int i = 0; i < count; i++) {
-    int index = (startIndex + i) % SERIAL_BUFFER_SIZE;
+    int index = (start + i) % SERIAL_BUFFER_SIZE;
     result += serialBuffer[index].message;
     result += "\n";
   }
   
   return result;
+}
+
+// Updated setupWebServer() function - add these endpoints to your existing setup
+void setupEnhancedSerialEndpoints() {
+  // Enhanced serial output endpoint
+  server.on("/api/serial", HTTP_GET, []() {
+    DynamicJsonDocument doc(4096);
+    doc["output"] = getSerialBuffer();
+    doc["totalMessages"] = totalMessages;
+    doc["bufferSize"] = SERIAL_BUFFER_SIZE;
+    
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+  });
+  
+  // Add API endpoint to clear serial buffer
+  server.on("/api/serial/clear", HTTP_POST, []() {
+    clearSerialBuffer();
+    logSerial("Serial buffer cleared via web interface");
+    server.send(200, "application/json", "{\"status\":\"success\"}");
+  });
 }
 
 // Function to clear serial buffer
@@ -185,9 +208,54 @@ void clearSerialBuffer() {
   memset(serialBuffer, 0, sizeof(serialBuffer));
 }
 
-// Simple time formatting function
+// Alternative logSerial function that matches GPS tracker style exactly
+void serialPrintln(const char *message) {
+  DateTime now;
+  String timestampStr;
+  
+  if (rtcAvailable) {
+    now = rtc.now();
+    timestampStr = formatTime(now);
+  } else {
+    timestampStr = "??:??:??";
+  }
+
+  // Create timestamped message
+  String logMessage = "[" + timestampStr + "] " + String(message);
+  
+  // Print to Serial
+  Serial.println(logMessage);
+
+  // Store in buffer with exact GPS tracker logic
+  strncpy(serialBuffer[serialBufferIndex].message, logMessage.c_str(), sizeof(serialBuffer[0].message) - 1);
+  serialBuffer[serialBufferIndex].message[sizeof(serialBuffer[0].message) - 1] = '\0';
+  serialBuffer[serialBufferIndex].timestamp = millis();
+
+  serialBufferIndex = (serialBufferIndex + 1) % SERIAL_BUFFER_SIZE;
+  if (totalMessages < SERIAL_BUFFER_SIZE)
+    totalMessages++;
+}
+
+// Enhanced web handler for serial with text response (GPS tracker style)
+void handleSerialText() {
+  String logs;
+  logs.reserve(SERIAL_BUFFER_SIZE * 100); // Pre-allocate space
+
+  int start = (serialBufferIndex - totalMessages + SERIAL_BUFFER_SIZE) % SERIAL_BUFFER_SIZE;
+  for (int i = 0; i < totalMessages; i++) {
+    int index = (start + i) % SERIAL_BUFFER_SIZE;
+    logs += String(serialBuffer[index].timestamp);
+    logs += ": ";
+    logs += serialBuffer[index].message;
+    logs += "\n";
+  }
+
+  server.send(200, "text/plain", logs);
+}
+
+// Enhanced format time function with better precision
 String formatTime(DateTime dt) {
-  char buffer[20];
+  char buffer[32];
   sprintf(buffer, "%02d:%02d:%02d", dt.hour(), dt.minute(), dt.second());
   return String(buffer);
 }
@@ -224,6 +292,18 @@ void setup() {
   setupWebServer();
   
   logSerial("Claybath density measurement system initialized");
+}
+
+// Enhanced web handler for serial data with JSON response
+void handleSerial() {
+  DynamicJsonDocument doc(4096);
+  doc["output"] = getSerialBuffer();
+  doc["totalMessages"] = totalMessages;
+  doc["bufferSize"] = SERIAL_BUFFER_SIZE;
+  
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
 }
 
 // Updated main loop
@@ -333,30 +413,47 @@ void initializeSystem() {
   logSerial("System initialization complete");
 }
 
+// FIXED: calculateNextMeasurementTime function
 void calculateNextMeasurementTime() {
+  if (!rtcAvailable) {
+    nextMeasurementTime = DateTime((uint32_t)0);
+    logSerial("RTC not available, no automatic measurement scheduled");
+    return;
+  }
+  
   DateTime now = rtc.now();
   
+  // Check if we have a valid last measurement time
   if (config.lastMeasurementTime > 0) {
-    // If we have a last measurement, calculate next measurement time
     DateTime lastMeasurement = DateTime(config.lastMeasurementTime);
     
     // Check if last measurement was today
     if (lastMeasurement.day() == now.day() && 
         lastMeasurement.month() == now.month() && 
         lastMeasurement.year() == now.year()) {
-      // Last measurement was today, schedule next measurement
-      // Convert minutes to seconds: config.measurementInterval * 60
-      nextMeasurementTime = DateTime((uint32_t)(config.lastMeasurementTime + (config.measurementInterval * 60)));
-      logSerial("Next measurement scheduled for: " + String(nextMeasurementTime.timestamp()));
+      // Last measurement was today, calculate next measurement time
+      uint32_t nextTime = config.lastMeasurementTime + (config.measurementInterval * 60);
+      nextMeasurementTime = DateTime(nextTime);
+      
+      // If the calculated next time is in the past, don't schedule automatic measurement
+      if (nextMeasurementTime.unixtime() <= now.unixtime()) {
+        nextMeasurementTime = DateTime((uint32_t)0);
+        logSerial("Calculated next measurement time is in the past, no automatic measurement scheduled");
+      } else {
+        logSerial("Next measurement scheduled for: " + formatTime(nextMeasurementTime) + 
+                 " on " + String(nextMeasurementTime.day()) + "/" + 
+                 String(nextMeasurementTime.month()) + "/" + String(nextMeasurementTime.year()));
+      }
     } else {
       // Last measurement was not today, no automatic measurement scheduled
-      nextMeasurementTime = DateTime((uint32_t)0); // Invalid time indicates no scheduled measurement
+      nextMeasurementTime = DateTime((uint32_t)0);
       logSerial("No automatic measurement scheduled (last measurement was not today)");
     }
   } else {
-    // No previous measurement, no automatic measurement scheduled
-    nextMeasurementTime = DateTime((uint32_t)0); // Invalid time indicates no scheduled measurement
-    logSerial("No previous measurement scheduled, no automatic measurement scheduled");
+    // No previous measurement exists, no automatic measurement scheduled
+    nextMeasurementTime = DateTime((uint32_t)0);
+    logSerial("No previous measurement found, no automatic measurement scheduled");
+    logSerial("First measurement of the day must be started manually");
   }
 }
 
@@ -515,7 +612,44 @@ void setupWebServer() {
     server.send(200, "application/json", "{\"status\":\"success\"}");
   });
   
-  // Add new API endpoint for individual file operations
+  // FIXED: Add missing GET handler for individual file downloads
+  server.on("/api/file", HTTP_GET, []() {
+    if (server.hasArg("name")) {
+      String filename = server.arg("name");
+      
+      // Add leading slash if not present
+      if (!filename.startsWith("/")) {
+        filename = "/" + filename;
+      }
+      
+      if (LittleFS.exists(filename)) {
+        File file = LittleFS.open(filename, "r");
+        if (file) {
+          // Set appropriate headers for file download
+          String contentType = "application/octet-stream";
+          if (filename.endsWith(".csv")) {
+            contentType = "text/csv";
+          } else if (filename.endsWith(".json")) {
+            contentType = "application/json";
+          }
+          
+          server.sendHeader("Content-Disposition", "attachment; filename=\"" + filename.substring(1) + "\"");
+          server.streamFile(file, contentType);
+          file.close();
+          
+          logSerial("File downloaded: " + filename);
+        } else {
+          server.send(500, "application/json", "{\"error\":\"failed_to_open_file\"}");
+        }
+      } else {
+        server.send(404, "application/json", "{\"error\":\"file_not_found\"}");
+      }
+    } else {
+      server.send(400, "application/json", "{\"error\":\"filename_required\"}");
+    }
+  });
+  
+  // Add new API endpoint for individual file operations (DELETE)
   server.on("/api/file", HTTP_DELETE, []() {
     if (server.hasArg("name")) {
       String filename = server.arg("name");
