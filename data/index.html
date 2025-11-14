@@ -236,6 +236,43 @@
             font-weight: bold;
         }
 
+        .auto-measurement-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            padding: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .auto-measurement-notice.enabled {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .auto-measurement-notice.disabled {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .auto-measurement-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #dee2e6;
+        }
+
+        .auto-measurement-toggle label {
+            margin: 0;
+            font-size: 1.1em;
+        }
+
         .file-list {
             max-height: 300px;
             overflow-y: auto;
@@ -354,6 +391,12 @@
             <!-- Status Panel -->
             <div class="card">
                 <h2>System Status</h2>
+                
+                <!-- Auto Measurement Status Notice -->
+                <div class="auto-measurement-notice" id="autoMeasurementNotice">
+                    <span id="autoMeasurementStatus">⚠️ Automatic measurements are disabled</span>
+                </div>
+
                 <div class="status-grid">
                     <div class="status-item">
                         <div class="label">Current Angle</div>
@@ -382,7 +425,7 @@
                 </div>
                 <div class="help-text" style="margin-bottom: 10px;">
                     Automatic measurements are scheduled based on the last measurement time + interval.
-                    If no measurement was taken today, no automatic measurement will be scheduled.
+                    Enable automatic measurements in Settings to allow scheduled measurements.
                 </div>
                 <div class="control-buttons">
                     <button class="btn success" onclick="startMeasurement()">Start Measurement</button>
@@ -419,6 +462,19 @@
             <!-- Settings Panel -->
             <div class="card">
                 <h2>Settings</h2>
+                
+                <!-- Auto Measurement Toggle -->
+                <div class="auto-measurement-toggle">
+                    <label for="autoMeasurementToggle">Enable Automatic Measurements</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoMeasurementToggle" onchange="toggleAutoMeasurement(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="help-text" style="margin-bottom: 15px;">
+                    When enabled, measurements will run automatically at the configured interval. When disabled, all measurements must be started manually.
+                </div>
+
                 <div class="form-group">
                     <label for="desiredDensity">Desired Density</label>
                     <input type="number" id="desiredDensity" step="0.001" value="1.025">
@@ -441,7 +497,7 @@
                 <div class="form-group">
                     <label for="measurementInterval">Measurement Interval (minutes)</label>
                     <input type="number" id="measurementInterval" value="30">
-                    <div class="help-text">How often automatic measurements are taken (in minutes)</div>
+                    <div class="help-text">How often automatic measurements are taken (in minutes) when enabled</div>
                 </div>
                 <div class="form-group">
                     <label for="fillDuration">Fill Duration (seconds)</label>
@@ -595,14 +651,56 @@
             document.getElementById('currentTime').textContent = 'Current Time: ' + timeString;
         }
 
+        // Auto measurement toggle function
+        async function toggleAutoMeasurement(enabled) {
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        autoMeasurementEnabled: enabled
+                    })
+                });
+
+                if (response.ok) {
+                    updateAutoMeasurementNotice(enabled);
+                    addSerialMessage('Automatic measurements ' + (enabled ? 'ENABLED' : 'DISABLED'));
+                    refreshStatus();
+                } else {
+                    alert('Error updating auto-measurement setting');
+                    // Revert toggle
+                    document.getElementById('autoMeasurementToggle').checked = !enabled;
+                }
+            } catch (error) {
+                console.error('Error toggling auto-measurement:', error);
+                alert('Error updating auto-measurement setting');
+                document.getElementById('autoMeasurementToggle').checked = !enabled;
+            }
+        }
+
+        // Update auto measurement notice
+        function updateAutoMeasurementNotice(enabled) {
+            const notice = document.getElementById('autoMeasurementNotice');
+            const status = document.getElementById('autoMeasurementStatus');
+            
+            if (enabled) {
+                notice.className = 'auto-measurement-notice enabled';
+                status.textContent = '✓ Automatic measurements are enabled';
+            } else {
+                notice.className = 'auto-measurement-notice disabled';
+                status.textContent = '⚠️ Automatic measurements are disabled';
+            }
+        }
+
         // Real serial monitoring functions
         function startSerialMonitoring() {
-            // Start monitoring real serial output from ESP32
             serialInterval = setInterval(() => {
                 if (!serialPaused) {
                     refreshSerial();
                 }
-            }, 2000); // Check every 2 seconds
+            }, 2000);
         }
 
         function updateSerialMonitor() {
@@ -613,7 +711,6 @@
                     output.textContent = data.output;
                     output.scrollTop = output.scrollHeight;
 
-                    // Update stats
                     const stats = document.getElementById('serialStats');
                     stats.textContent = `Messages: ${data.totalMessages}/${data.bufferSize}`;
                 })
@@ -622,7 +719,6 @@
                 });
         }
 
-        // Update the existing refreshSerial function to use the new endpoint
         async function refreshSerial() {
             try {
                 const response = await fetch('/api/serial');
@@ -633,7 +729,6 @@
                     output.textContent = data.output;
                     output.scrollTop = output.scrollHeight;
 
-                    // Update stats
                     const stats = document.getElementById('serialStats');
                     stats.textContent = `Messages: ${data.totalMessages || 0}/${data.bufferSize || 100}`;
                 }
@@ -642,37 +737,18 @@
             }
         }
 
-        // Fallback simulation for development
-        function simulateSerialData() {
-            const messages = [
-                'MPU6050 reading: Angle = 42.5°',
-                'Measurement cycle started',
-                'Fill solenoid activated',
-                'Waiting for liquid to settle...',
-                'Taking measurements...',
-                'Angle calculated: 43.2°',
-                'Empty solenoid activated',
-                'Measurement complete'
-            ];
-
-            const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-            const timestamp = new Date().toLocaleTimeString();
-            addSerialMessage(`[${timestamp}] ${randomMessage}`);
-        }
-
         function addSerialMessage(message) {
             const output = document.getElementById('serialOutput');
-            output.textContent += message + '\n';
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
             output.scrollTop = output.scrollHeight;
 
-            // Limit output to last 1000 lines
             const lines = output.textContent.split('\n');
             if (lines.length > 1000) {
                 output.textContent = lines.slice(-1000).join('\n');
             }
         }
 
-        // Enhanced clear function
         async function clearSerial() {
             try {
                 const response = await fetch('/api/serial/clear', {
@@ -708,8 +784,6 @@
             const command = input.value.trim();
             if (command) {
                 addSerialMessage(`> ${command}`);
-                // Here you would send the command to the ESP32
-                // For simulation, we'll just echo back
                 setTimeout(() => {
                     addSerialMessage(`Command "${command}" sent to device`);
                 }, 100);
@@ -717,38 +791,23 @@
             }
         }
 
-        // FIXED: Timezone handling functions
-        // Get timezone offset in seconds (ESP32 stores in UTC, convert to local time)
         function getTimezoneOffsetSeconds() {
             const now = new Date();
-            return now.getTimezoneOffset() * -60; // Convert minutes to seconds, invert sign
+            return now.getTimezoneOffset() * -60;
         }
 
-        // FIXED: Updated formatDateTime function with timezone correction
         function formatDateTime(timestamp) {
             if (!timestamp || timestamp === 0) return '--';
-            
-            // ESP32 stores in UTC, but we want to display in local timezone
             const utcDate = new Date(timestamp * 1000);
-            
-            // Convert to local timezone string
             return utcDate.toLocaleDateString() + ' ' + utcDate.toLocaleTimeString();
         }
 
-        // Alternative function for more precise timezone handling
         function formatDateTimeWithOffset(timestamp) {
             if (!timestamp || timestamp === 0) return '--';
-            
-            // Create date from UTC timestamp
             const utcDate = new Date(timestamp * 1000);
-
-            // Subtract 8 hours (in ms)
             utcDate.setHours(utcDate.getHours() - 7);
-
-            // Convert to local timezone string
             return utcDate.toLocaleDateString() + ' ' + utcDate.toLocaleTimeString();
         }
-
 
         // File management functions
         async function refreshFileList() {
@@ -803,7 +862,6 @@
             return date.toLocaleDateString();
         }
 
-        // FIXED: Download file function
         async function downloadFile(filename) {
             try {
                 const response = await fetch(`/api/file?name=${encodeURIComponent(filename)}`);
@@ -860,12 +918,14 @@
                 document.getElementById('emptyDuration').value = config.emptyDuration;
                 document.getElementById('calibrationOffset').value = config.calibrationOffset;
                 document.getElementById('calibrationScale').value = config.calibrationScale;
-
-                // Load angle range settings
                 document.getElementById('targetAngleMin').value = config.targetAngleMin || 40.0;
                 document.getElementById('targetAngleMax').value = config.targetAngleMax || 45.0;
 
-                // Show last measurement info if available
+                // Load auto measurement toggle state
+                const autoEnabled = config.autoMeasurementEnabled || false;
+                document.getElementById('autoMeasurementToggle').checked = autoEnabled;
+                updateAutoMeasurementNotice(autoEnabled);
+
                 if (config.lastMeasurementTime > 0) {
                     addSerialMessage('Last measurement loaded: ' + config.lastMeasurementValue.toFixed(3) +
                         ' (angle: ' + (config.lastMeasurementAngle || 0).toFixed(1) + '°) at ' +
@@ -887,9 +947,9 @@
                 emptyDuration: parseInt(document.getElementById('emptyDuration').value),
                 calibrationOffset: parseFloat(document.getElementById('calibrationOffset').value),
                 calibrationScale: parseFloat(document.getElementById('calibrationScale').value),
-                // Include angle range settings
                 targetAngleMin: parseFloat(document.getElementById('targetAngleMin').value),
-                targetAngleMax: parseFloat(document.getElementById('targetAngleMax').value)
+                targetAngleMax: parseFloat(document.getElementById('targetAngleMax').value),
+                autoMeasurementEnabled: document.getElementById('autoMeasurementToggle').checked
             };
 
             try {
@@ -942,7 +1002,7 @@
             }
         }
 
-        // FIXED: Refresh system status with timezone handling
+        // Refresh system status
         async function refreshStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -952,21 +1012,24 @@
                 document.getElementById('currentDensity').textContent = status.currentDensity.toFixed(3);
                 document.getElementById('lastMeasurement').textContent = status.lastMeasurement.toFixed(3);
 
-                // Display last measurement angle
                 if (status.lastMeasurementAngle !== undefined && status.lastMeasurementAngle > 0) {
                     document.getElementById('lastAngle').textContent = status.lastMeasurementAngle.toFixed(1) + '°';
                 } else {
                     document.getElementById('lastAngle').textContent = '--°';
                 }
 
-                // Handle next measurement display with timezone correction
+                // Update auto measurement notice
+                if (status.autoMeasurementEnabled !== undefined) {
+                    document.getElementById('autoMeasurementToggle').checked = status.autoMeasurementEnabled;
+                    updateAutoMeasurementNotice(status.autoMeasurementEnabled);
+                }
+
                 if (status.hasScheduledMeasurement && status.nextMeasurementTime > 0) {
                     document.getElementById('nextMeasurement').textContent = formatDateTimeWithOffset(status.nextMeasurementTime);
                 } else {
                     document.getElementById('nextMeasurement').textContent = 'No scheduled measurement';
                 }
 
-                // Handle last measurement time with timezone correction
                 if (status.lastMeasurementTime > 0) {
                     document.getElementById('lastMeasurementTime').textContent = formatDateTimeWithOffset(status.lastMeasurementTime);
                 } else {
@@ -1034,7 +1097,7 @@
             }
         }
 
-        // FIXED: Set date and time with proper timezone handling
+        // Set date and time
         async function setDateTime() {
             const datetimeValue = document.getElementById('datetime').value;
             if (!datetimeValue) {
@@ -1042,11 +1105,8 @@
                 return;
             }
 
-            // Create local date from input
             const localDate = new Date(datetimeValue);
             
-            // ESP32 expects UTC time, so send the local time as-is since
-            // the ESP32 doesn't handle timezone conversions
             const dateTime = {
                 year: localDate.getFullYear(),
                 month: localDate.getMonth() + 1,
