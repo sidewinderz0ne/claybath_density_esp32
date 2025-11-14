@@ -3,8 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claybath Density Measurement System</title>
+    <meta name="viewport" content="width=800, height=400, initial-scale=1.0, user-scalable=no">
+    <title>Claybath Density System</title>
     <style>
         * {
             margin: 0;
@@ -16,118 +16,213 @@
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
             color: #333;
+            overflow: hidden;
+            width: 800px;
+            height: 400px;
+            position: fixed;
+            padding-left: 10px;
+            padding-right: 170px;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 4px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 30px;
+            font-size: 10px;
         }
 
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
+        .header h1 {
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .current-time {
+            font-size: 9px;
+            color: #ecf0f1;
+        }
+
+        .tabs {
+            display: flex;
+            background: #34495e;
+            border-bottom: 2px solid #2c3e50;
+            height: 28px;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .tab {
+            padding: 4px 8px;
+            background: #34495e;
+            color: #ecf0f1;
+            border: none;
+            cursor: pointer;
+            font-size: 9px;
+            white-space: nowrap;
+            border-right: 1px solid #2c3e50;
+            min-width: 60px;
+        }
+
+        .tab:hover {
+            background: #3d566e;
+        }
+
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .content-area {
+            height: calc(400px - 58px);
+            overflow: hidden;
+            background: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 10px;
+            height: 100%;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         .card {
             background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
         }
 
         .card h2 {
             color: #34495e;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
+            font-size: 15px;
             border-bottom: 2px solid #3498db;
-            padding-bottom: 5px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        .full-width {
-            grid-column: 1 / -1;
+            padding-bottom: 4px;
         }
 
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
         }
 
         .status-item {
             background: #ecf0f1;
-            padding: 15px;
-            border-radius: 5px;
+            padding: 6px;
+            border-radius: 3px;
             text-align: center;
         }
 
         .status-item .label {
             font-weight: bold;
             color: #7f8c8d;
-            font-size: 0.9em;
+            font-size: 11px;
+            letter-spacing: 0.5px;
         }
 
         .status-item .value {
-            font-size: 1.4em;
+            font-size: 14px;
             color: #2c3e50;
-            margin-top: 5px;
+            margin-top: 4px;
+        }
+
+        .auto-measurement-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 4px;
+            padding: 6px;
+            margin-bottom: 8px;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .auto-measurement-notice.enabled {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .auto-measurement-notice.disabled {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .auto-measurement-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            border: 2px solid #dee2e6;
+        }
+
+        .auto-measurement-toggle label {
+            margin: 0;
+            font-size: 10px;
+            font-weight: bold;
         }
 
         .form-group {
-            margin-bottom: 15px;
-            position: relative;
+            margin-bottom: 8px;
         }
 
         label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             font-weight: bold;
             color: #555;
+            font-size: 10px;
         }
 
         .help-text {
-            font-size: 0.85em;
+            font-size: 9px;
             color: #7f8c8d;
             font-style: italic;
-            margin-top: 3px;
+            margin-top: 2px;
         }
 
         input,
         select {
             width: 100%;
-            padding: 8px;
+            padding: 4px;
             border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
+            border-radius: 3px;
+            font-size: 11px;
         }
 
         input[type="datetime-local"] {
             padding: 8px;
+            height: 40px;
+            font-size: 12px;
+            cursor: pointer;
         }
 
         .angle-range-inputs {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 6px;
         }
 
         .btn {
             background: #3498db;
             color: white;
-            padding: 10px 20px;
+            padding: 5px 10px;
             border: none;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
-            font-size: 14px;
-            margin-right: 10px;
-            margin-bottom: 10px;
+            font-size: 11px;
+            margin-right: 5px;
+            margin-bottom: 5px;
         }
 
         .btn:hover {
@@ -160,26 +255,27 @@
 
         .control-buttons {
             display: flex;
-            flex-wrap: wrap;
+            justify-content: center;
             gap: 10px;
-            margin-top: 10px;
+            margin-top: 15px;
         }
 
         .relay-control {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px;
+            padding: 6px;
             background: #f8f9fa;
-            border-radius: 4px;
-            margin-bottom: 10px;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            font-size: 10px;
         }
 
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 60px;
-            height: 34px;
+            width: 45px;
+            height: 24px;
         }
 
         .toggle-switch input {
@@ -197,16 +293,16 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 34px;
+            border-radius: 24px;
         }
 
         .slider:before {
             position: absolute;
             content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
@@ -217,67 +313,19 @@
         }
 
         input:checked+.slider:before {
-            transform: translateX(26px);
+            transform: translateX(21px);
         }
 
         .measuring {
             background: #e8f5e8 !important;
-            border-left: 4px solid #27ae60;
-        }
-
-        .current-time {
-            background: #3498db;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-
-        .auto-measurement-notice {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 5px;
-            padding: 12px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .auto-measurement-notice.enabled {
-            background: #d4edda;
-            border-color: #28a745;
-        }
-
-        .auto-measurement-notice.disabled {
-            background: #f8d7da;
-            border-color: #dc3545;
-        }
-
-        .auto-measurement-toggle {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border: 2px solid #dee2e6;
-        }
-
-        .auto-measurement-toggle label {
-            margin: 0;
-            font-size: 1.1em;
+            border-left: 3px solid #27ae60;
         }
 
         .file-list {
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 3px;
             background: #f8f9fa;
         }
 
@@ -285,8 +333,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
+            padding: 5px;
             border-bottom: 1px solid #eee;
+            font-size: 10px;
         }
 
         .file-item:last-child {
@@ -303,56 +352,61 @@
         }
 
         .file-size {
-            font-size: 0.85em;
+            font-size: 9px;
             color: #7f8c8d;
         }
 
         .file-actions {
             display: flex;
-            gap: 5px;
+            gap: 3px;
         }
 
         .btn-small {
-            padding: 5px 10px;
-            font-size: 12px;
+            padding: 3px 6px;
+            font-size: 9px;
         }
 
         .serial-monitor {
             background: #2c3e50;
             color: #ecf0f1;
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
+            height: calc(100% - 20px);
+            display: flex;
+            flex-direction: column;
         }
 
         .serial-header {
             background: #34495e;
-            padding: 10px;
+            padding: 5px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 10px;
         }
 
         .serial-stats {
-            font-size: 0.9em;
+            font-size: 9px;
             color: #95a5a6;
         }
 
         .serial-output {
-            height: 300px;
+            flex: 1;
             overflow-y: auto;
-            padding: 10px;
+            padding: 5px;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.4;
+            font-size: 10px;
+            line-height: 1.3;
             white-space: pre-wrap;
             background: #2c3e50;
+            min-height: 0;
         }
 
         .serial-input {
-            padding: 10px;
+            padding: 5px;
             background: #34495e;
             display: flex;
-            gap: 10px;
+            gap: 5px;
         }
 
         .serial-input input {
@@ -360,41 +414,114 @@
             background: #2c3e50;
             color: #ecf0f1;
             border: 1px solid #4a6741;
+            font-size: 10px;
+            padding: 3px;
         }
 
         .serial-input input::placeholder {
             color: #95a5a6;
         }
 
-        @media (max-width: 768px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
+        .compact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
 
-            .angle-range-inputs {
-                grid-template-columns: 1fr;
-            }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .fab-container {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .fab {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+            pointer-events: auto;
+        }
+
+        .fab:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        .fab:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .fab:disabled:hover {
+            transform: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        .toggle-switch input,
+        button,
+        label,
+        .slider {
+            touch-action: manipulation;
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>Claybath Density Measurement System</h1>
+    <div class="header">
+        <h1>Claybath Density System</h1>
+        <div class="current-time" id="currentTime">Loading...</div>
+    </div>
 
-        <!-- Current Time Display -->
-        <div class="current-time" id="currentTime">
-            Loading current time...
-        </div>
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('status', this)">Status</button>
+        <button class="tab" onclick="showTab('serial', this)">Serial</button>
+        <button class="tab" onclick="showTab('settings', this)">Settings</button>
+        <button class="tab" onclick="showTab('calibration', this)">Calibration</button>
+        <button class="tab" onclick="showTab('control', this)">Control</button>
+        <button class="tab" onclick="showTab('datetime', this)">Date/Time</button>
+        <button class="tab" onclick="showTab('data', this)">Data</button>
+    </div>
 
-        <div class="grid">
-            <!-- Status Panel -->
+    <div class="content-area">
+        <!-- System Status Tab -->
+        <div id="tab-status" class="tab-content active">
             <div class="card">
                 <h2>System Status</h2>
                 
-                <!-- Auto Measurement Status Notice -->
-                <div class="auto-measurement-notice" id="autoMeasurementNotice">
-                    <span id="autoMeasurementStatus">⚠️ Automatic measurements are disabled</span>
+                <!-- Auto Measurement Notice -->
+                <div class="auto-measurement-notice disabled" id="autoMeasurementNotice">
+                    <span id="autoMeasurementStatus">⚠️ Auto measurements disabled</span>
                 </div>
 
                 <div class="status-grid">
@@ -423,124 +550,125 @@
                         <div class="value" id="systemStatus">Ready</div>
                     </div>
                 </div>
-                <div class="help-text" style="margin-bottom: 10px;">
-                    Automatic measurements are scheduled based on the last measurement time + interval.
-                    Enable automatic measurements in Settings to allow scheduled measurements.
+                <div class="help-text" style="margin-bottom: 5px; font-size: 8px;">
+                    Auto measurements scheduled based on last + interval. Enable in Settings.
                 </div>
                 <div class="control-buttons">
                     <button class="btn success" onclick="startMeasurement()">Start Measurement</button>
-                    <button class="btn" onclick="refreshStatus()">Refresh Status</button>
+                    <button class="btn" onclick="refreshStatus()">Refresh</button>
                 </div>
             </div>
+        </div>
 
-            <!-- Serial Monitor - Full Width -->
-            <div class="card full-width">
-                <h2>Serial Monitor</h2>
-                <div class="serial-monitor">
-                    <div class="serial-header">
-                        <span>System Debug Output</span>
-                        <div class="serial-stats">
-                            <span id="serialStats">Messages: 0/100</span>
-                        </div>
-                        <div>
-                            <button class="btn btn-small" onclick="clearSerial()">Clear</button>
-                            <button class="btn btn-small" id="serialToggle" onclick="toggleSerial()">Pause</button>
-                            <button class="btn btn-small" onclick="refreshSerial()">Refresh</button>
-                        </div>
+        <!-- Serial Monitor Tab -->
+        <div id="tab-serial" class="tab-content">
+            <div class="serial-monitor">
+                <div class="serial-header">
+                    <span>System Debug Output</span>
+                    <div class="serial-stats">
+                        <span id="serialStats">Messages: 0/100</span>
                     </div>
-                    <div class="serial-output" id="serialOutput">
-                        Serial monitor starting...\n
-                    </div>
-                    <div class="serial-input">
-                        <input type="text" id="serialInput" placeholder="Enter command..."
-                            onkeypress="handleSerialInput(event)">
-                        <button class="btn btn-small" onclick="sendSerialCommand()">Send</button>
+                    <div>
+                        <button class="btn btn-small" onclick="clearSerial()">Clear</button>
+                        <button class="btn btn-small" id="serialToggle" onclick="toggleSerial()">Pause</button>
+                        <button class="btn btn-small" onclick="refreshSerial()">Refresh</button>
                     </div>
                 </div>
+                <div class="serial-output" id="serialOutput">
+                    Serial monitor starting...\n
+                </div>
+                <div class="serial-input">
+                    <input type="text" id="serialInput" placeholder="Enter command..."
+                        onkeypress="handleSerialInput(event)">
+                    <button class="btn btn-small" onclick="sendSerialCommand()">Send</button>
+                </div>
             </div>
+        </div>
 
-            <!-- Settings Panel -->
+        <!-- Settings Tab -->
+        <div id="tab-settings" class="tab-content">
             <div class="card">
                 <h2>Settings</h2>
                 
                 <!-- Auto Measurement Toggle -->
                 <div class="auto-measurement-toggle">
-                    <label for="autoMeasurementToggle">Enable Automatic Measurements</label>
+                    <label for="autoMeasurementToggle">Enable Auto Measurements</label>
                     <label class="toggle-switch">
                         <input type="checkbox" id="autoMeasurementToggle" onchange="toggleAutoMeasurement(this.checked)">
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="help-text" style="margin-bottom: 15px;">
-                    When enabled, measurements will run automatically at the configured interval. When disabled, all measurements must be started manually.
+                <div class="help-text" style="margin-bottom: 8px;">
+                    When enabled, measurements run at configured interval. When disabled, must start manually.
                 </div>
 
-                <div class="form-group">
-                    <label for="desiredDensity">Desired Density</label>
-                    <input type="number" id="desiredDensity" step="0.001" value="1.025">
-                    <div class="help-text">Target density value for the claybath (typically 1.020-1.030)</div>
-                </div>
-                <div class="form-group">
-                    <label>Target Angle Range</label>
-                    <div class="angle-range-inputs">
-                        <div>
-                            <label for="targetAngleMin">Minimum (°)</label>
-                            <input type="number" id="targetAngleMin" step="0.1" value="40.0">
-                        </div>
-                        <div>
-                            <label for="targetAngleMax">Maximum (°)</label>
-                            <input type="number" id="targetAngleMax" step="0.1" value="45.0">
+                <div class="compact-grid">
+                    <div class="form-group">
+                        <label for="desiredDensity">Desired Density</label>
+                        <input type="number" id="desiredDensity" step="0.001" value="1.025">
+                        <div class="help-text">Target density (1.020-1.030)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="measurementInterval">Interval (min)</label>
+                        <input type="number" id="measurementInterval" value="30">
+                        <div class="help-text">Auto measurement interval</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Angle Range</label>
+                        <div class="angle-range-inputs">
+                            <div>
+                                <label for="targetAngleMin" style="font-size: 9px;">Min (°)</label>
+                                <input type="number" id="targetAngleMin" step="0.1" value="40.0">
+                            </div>
+                            <div>
+                                <label for="targetAngleMax" style="font-size: 9px;">Max (°)</label>
+                                <input type="number" id="targetAngleMax" step="0.1" value="45.0">
+                            </div>
                         </div>
                     </div>
-                    <div class="help-text">Target angle range for optimal claybath density (displayed on OLED)</div>
-                </div>
-                <div class="form-group">
-                    <label for="measurementInterval">Measurement Interval (minutes)</label>
-                    <input type="number" id="measurementInterval" value="30">
-                    <div class="help-text">How often automatic measurements are taken (in minutes) when enabled</div>
-                </div>
-                <div class="form-group">
-                    <label for="fillDuration">Fill Duration (seconds)</label>
-                    <input type="number" id="fillDuration" value="5">
-                    <div class="help-text">Time to fill the measurement chamber</div>
-                </div>
-                <div class="form-group">
-                    <label for="waitDuration">Wait Duration (seconds)</label>
-                    <input type="number" id="waitDuration" value="60">
-                    <div class="help-text">Time to wait for liquid to settle before measuring</div>
-                </div>
-                <div class="form-group">
-                    <label for="measurementDuration">Measurement Duration (seconds)</label>
-                    <input type="number" id="measurementDuration" value="10">
-                    <div class="help-text">Duration for taking angle measurements</div>
-                </div>
-                <div class="form-group">
-                    <label for="emptyDuration">Empty Duration (seconds)</label>
-                    <input type="number" id="emptyDuration" value="120">
-                    <div class="help-text">Time to completely empty the measurement chamber</div>
+                    <div class="form-group">
+                        <label for="fillDuration">Fill (sec)</label>
+                        <input type="number" id="fillDuration" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label for="waitDuration">Wait (sec)</label>
+                        <input type="number" id="waitDuration" value="60">
+                    </div>
+                    <div class="form-group">
+                        <label for="measurementDuration">Measure (sec)</label>
+                        <input type="number" id="measurementDuration" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="emptyDuration">Empty (sec)</label>
+                        <input type="number" id="emptyDuration" value="120">
+                    </div>
                 </div>
                 <button class="btn success" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Calibration Panel -->
+        <!-- Calibration Tab -->
+        <div id="tab-calibration" class="tab-content">
             <div class="card">
                 <h2>MPU6050 Calibration</h2>
-                <div class="form-group">
-                    <label for="calibrationOffset">Calibration Offset</label>
-                    <input type="number" id="calibrationOffset" step="0.01" value="0.0">
-                    <div class="help-text">Angle offset to correct for mounting position</div>
-                </div>
-                <div class="form-group">
-                    <label for="calibrationScale">Calibration Scale</label>
-                    <input type="number" id="calibrationScale" step="0.01" value="1.0">
-                    <div class="help-text">Scale factor to convert angle to density</div>
+                <div class="compact-grid">
+                    <div class="form-group">
+                        <label for="calibrationOffset">Calibration Offset</label>
+                        <input type="number" id="calibrationOffset" step="0.01" value="0.0">
+                        <div class="help-text">Angle offset correction</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="calibrationScale">Calibration Scale</label>
+                        <input type="number" id="calibrationScale" step="0.01" value="1.0">
+                        <div class="help-text">Scale factor for density</div>
+                    </div>
                 </div>
                 <button class="btn success" onclick="saveCalibration()">Save Calibration</button>
             </div>
+        </div>
 
-            <!-- Manual Control Panel -->
+        <!-- Manual Control Tab -->
+        <div id="tab-control" class="tab-content">
             <div class="card">
                 <h2>Manual Control</h2>
                 <div class="relay-control">
@@ -550,7 +678,7 @@
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="help-text">Controls the solenoid valve that fills the measurement chamber</div>
+                <div class="help-text">Controls fill valve</div>
 
                 <div class="relay-control">
                     <span>Empty Solenoid</span>
@@ -560,7 +688,7 @@
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="help-text">Controls the solenoid valve that empties the measurement chamber</div>
+                <div class="help-text">Controls empty valve</div>
 
                 <div class="relay-control">
                     <span>Measuring Light (OFF=Red, ON=Green)</span>
@@ -570,51 +698,59 @@
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="help-text">Status indicator light - Red when idle, Green when measuring</div>
+                <div class="help-text">Status indicator light</div>
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Date/Time Settings -->
+        <!-- Date/Time Tab -->
+        <div id="tab-datetime" class="tab-content">
             <div class="card">
                 <h2>Date & Time Settings</h2>
                 <div class="form-group">
                     <label for="datetime">Set Date & Time</label>
                     <input type="datetime-local" id="datetime">
-                    <div class="help-text">Set the current date and time for the DS3231 RTC module</div>
+                    <div class="help-text">Set DS3231 RTC module time</div>
                 </div>
                 <div class="control-buttons">
+                    <button class="btn warning" onclick="adjustDateTime()">Adjust Datetime</button>
                     <button class="btn success" onclick="setDateTime()">Set Date & Time</button>
                     <button class="btn" onclick="setCurrentDateTime()">Use Current Time</button>
                 </div>
             </div>
+        </div>
 
-            <!-- Data Management -->
+        <!-- Data Management Tab -->
+        <div id="tab-data" class="tab-content">
             <div class="card">
                 <h2>Data Management</h2>
-                <div class="status-item" style="margin-bottom: 15px;">
+                <div class="status-item" style="margin-bottom: 8px;">
                     <div class="label">Last Measurement Time</div>
                     <div class="value" id="lastMeasurementTime">--</div>
                 </div>
 
-                <h3 style="margin-bottom: 10px;">Data Files</h3>
-                <div class="help-text" style="margin-bottom: 10px;">
-                    Measurement data is automatically saved to daily CSV files. Each file contains timestamp, density,
-                    and angle measurements.
+                <h3 style="margin-bottom: 5px; font-size: 11px;">Data Files</h3>
+                <div class="help-text" style="margin-bottom: 5px; font-size: 8px;">
+                    Measurement data saved to daily CSV files.
                 </div>
                 <div class="file-list" id="fileList">
-                    <div style="padding: 20px; text-align: center; color: #7f8c8d;">
+                    <div style="padding: 10px; text-align: center; color: #7f8c8d; font-size: 9px;">
                         Loading files...
                     </div>
                 </div>
 
-                <div class="control-buttons" style="margin-top: 15px;">
-                    <button class="btn" onclick="refreshFileList()">Refresh Files</button>
-                    <button class="btn" onclick="downloadAllData()">Download All Data</button>
-                    <button class="btn danger" onclick="deleteAllData()">Delete All Data</button>
+                <div class="control-buttons" style="margin-top: 8px;">
+                    <button class="btn" onclick="refreshFileList()">Refresh</button>
+                    <button class="btn" onclick="downloadAllData()">Download All</button>
+                    <button class="btn danger" onclick="deleteAllData()">Delete All</button>
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- FAB Navigation Buttons -->
+    <div class="fab-container">
+        <button class="fab" id="fabPrev" onclick="navigateTab(-1)" title="Previous Menu">‹</button>
+        <button class="fab" id="fabNext" onclick="navigateTab(1)" title="Next Menu">›</button>
     </div>
 
     <script>
@@ -624,34 +760,90 @@
         let serialPaused = false;
         let lastSerialUpdate = 0;
 
-        // Initialize the page
+        const tabOrder = ['status', 'serial', 'settings', 'calibration', 'control', 'datetime', 'data'];
+        let currentTabIndex = 0;
+
+        function showTab(tabName, clickedElement) {
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            const tabButtons = document.querySelectorAll('.tab');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            if (clickedElement) {
+                clickedElement.classList.add('active');
+            } else {
+                tabButtons.forEach(btn => {
+                    const onclick = btn.getAttribute('onclick') || '';
+                    if (onclick.includes("'" + tabName + "'") || onclick.includes('"' + tabName + '"')) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
+            currentTabIndex = tabOrder.indexOf(tabName);
+            if (currentTabIndex === -1) currentTabIndex = 0;
+
+            updateFABButtons();
+        }
+
+        // Adjust datetime - opens the datetime picker
+        function adjustDateTime() {
+            const datetimeInput = document.getElementById('datetime');
+            datetimeInput.focus();
+            datetimeInput.click();
+            // For some browsers, triggering showPicker() works better
+            if (datetimeInput.showPicker) {
+                try {
+                    datetimeInput.showPicker();
+                } catch (e) {
+                    // Fallback if showPicker is not supported
+                    console.log('showPicker not supported, using focus/click');
+                }
+            }
+        }
+
+        function navigateTab(direction) {
+            currentTabIndex += direction;
+
+            if (currentTabIndex < 0) {
+                currentTabIndex = tabOrder.length - 1;
+            } else if (currentTabIndex >= tabOrder.length) {
+                currentTabIndex = 0;
+            }
+
+            const tabName = tabOrder[currentTabIndex];
+            showTab(tabName);
+        }
+
+        function updateFABButtons() {
+            // Keep enabled for wrap-around navigation
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
+            currentTabIndex = tabOrder.indexOf('status');
+            updateFABButtons();
+
             loadSettings();
             refreshStatus();
             refreshFileList();
 
-            // Auto-refresh status every 5 seconds
             statusInterval = setInterval(refreshStatus, 5000);
-
-            // Update current time every second
             timeInterval = setInterval(updateCurrentTime, 1000);
             updateCurrentTime();
 
-            // Start real serial monitoring
             startSerialMonitoring();
-
-            // Set current datetime in picker
             setCurrentDateTime();
         });
 
-        // Update current time display
         function updateCurrentTime() {
             const now = new Date();
             const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
-            document.getElementById('currentTime').textContent = 'Current Time: ' + timeString;
+            document.getElementById('currentTime').textContent = timeString;
         }
 
-        // Auto measurement toggle function
         async function toggleAutoMeasurement(enabled) {
             try {
                 const response = await fetch('/api/config', {
@@ -666,57 +858,38 @@
 
                 if (response.ok) {
                     updateAutoMeasurementNotice(enabled);
-                    addSerialMessage('Automatic measurements ' + (enabled ? 'ENABLED' : 'DISABLED'));
+                    addSerialMessage('Auto measurements ' + (enabled ? 'ENABLED' : 'DISABLED'));
                     refreshStatus();
                 } else {
-                    alert('Error updating auto-measurement setting');
-                    // Revert toggle
+                    alert('Error updating auto-measurement');
                     document.getElementById('autoMeasurementToggle').checked = !enabled;
                 }
             } catch (error) {
                 console.error('Error toggling auto-measurement:', error);
-                alert('Error updating auto-measurement setting');
+                alert('Error updating auto-measurement');
                 document.getElementById('autoMeasurementToggle').checked = !enabled;
             }
         }
 
-        // Update auto measurement notice
         function updateAutoMeasurementNotice(enabled) {
             const notice = document.getElementById('autoMeasurementNotice');
             const status = document.getElementById('autoMeasurementStatus');
             
             if (enabled) {
                 notice.className = 'auto-measurement-notice enabled';
-                status.textContent = '✓ Automatic measurements are enabled';
+                status.textContent = '✓ Auto measurements enabled';
             } else {
                 notice.className = 'auto-measurement-notice disabled';
-                status.textContent = '⚠️ Automatic measurements are disabled';
+                status.textContent = '⚠️ Auto measurements disabled';
             }
         }
 
-        // Real serial monitoring functions
         function startSerialMonitoring() {
             serialInterval = setInterval(() => {
                 if (!serialPaused) {
                     refreshSerial();
                 }
             }, 2000);
-        }
-
-        function updateSerialMonitor() {
-            fetch('/api/serial')
-                .then(response => response.json())
-                .then(data => {
-                    const output = document.getElementById('serialOutput');
-                    output.textContent = data.output;
-                    output.scrollTop = output.scrollHeight;
-
-                    const stats = document.getElementById('serialStats');
-                    stats.textContent = `Messages: ${data.totalMessages}/${data.bufferSize}`;
-                })
-                .catch(error => {
-                    console.error('Error fetching serial data:', error);
-                });
         }
 
         async function refreshSerial() {
@@ -791,17 +964,6 @@
             }
         }
 
-        function getTimezoneOffsetSeconds() {
-            const now = new Date();
-            return now.getTimezoneOffset() * -60;
-        }
-
-        function formatDateTime(timestamp) {
-            if (!timestamp || timestamp === 0) return '--';
-            const utcDate = new Date(timestamp * 1000);
-            return utcDate.toLocaleDateString() + ' ' + utcDate.toLocaleTimeString();
-        }
-
         function formatDateTimeWithOffset(timestamp) {
             if (!timestamp || timestamp === 0) return '--';
             const utcDate = new Date(timestamp * 1000);
@@ -809,7 +971,6 @@
             return utcDate.toLocaleDateString() + ' ' + utcDate.toLocaleTimeString();
         }
 
-        // File management functions
         async function refreshFileList() {
             try {
                 const response = await fetch('/api/files');
@@ -818,7 +979,7 @@
             } catch (error) {
                 console.error('Error refreshing file list:', error);
                 document.getElementById('fileList').innerHTML =
-                    '<div style="padding: 20px; text-align: center; color: #e74c3c;">Error loading files</div>';
+                    '<div style="padding: 10px; text-align: center; color: #e74c3c; font-size: 9px;">Error loading files</div>';
             }
         }
 
@@ -826,7 +987,7 @@
             const fileList = document.getElementById('fileList');
 
             if (files.length === 0) {
-                fileList.innerHTML = '<div style="padding: 20px; text-align: center; color: #7f8c8d;">No files found</div>';
+                fileList.innerHTML = '<div style="padding: 10px; text-align: center; color: #7f8c8d; font-size: 9px;">No files found</div>';
                 return;
             }
 
@@ -904,7 +1065,6 @@
             }
         }
 
-        // Load settings from device
         async function loadSettings() {
             try {
                 const response = await fetch('/api/config');
@@ -921,22 +1081,19 @@
                 document.getElementById('targetAngleMin').value = config.targetAngleMin || 40.0;
                 document.getElementById('targetAngleMax').value = config.targetAngleMax || 45.0;
 
-                // Load auto measurement toggle state
                 const autoEnabled = config.autoMeasurementEnabled || false;
                 document.getElementById('autoMeasurementToggle').checked = autoEnabled;
                 updateAutoMeasurementNotice(autoEnabled);
 
                 if (config.lastMeasurementTime > 0) {
                     addSerialMessage('Last measurement loaded: ' + config.lastMeasurementValue.toFixed(3) +
-                        ' (angle: ' + (config.lastMeasurementAngle || 0).toFixed(1) + '°) at ' +
-                        formatDateTime(config.lastMeasurementTime));
+                        ' (angle: ' + (config.lastMeasurementAngle || 0).toFixed(1) + '°)');
                 }
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
         }
 
-        // Save settings to device
         async function saveSettings() {
             const config = {
                 desiredDensity: parseFloat(document.getElementById('desiredDensity').value),
@@ -963,8 +1120,8 @@
 
                 if (response.ok) {
                     alert('Settings saved successfully!');
-                    addSerialMessage('Settings updated including angle range: ' +
-                        config.targetAngleMin + '° - ' + config.targetAngleMax + '°');
+                    addSerialMessage('Settings updated: angle ' +
+                        config.targetAngleMin + '°-' + config.targetAngleMax + '°');
                 } else {
                     alert('Error saving settings');
                 }
@@ -974,7 +1131,6 @@
             }
         }
 
-        // Save calibration settings
         async function saveCalibration() {
             const config = {
                 calibrationOffset: parseFloat(document.getElementById('calibrationOffset').value),
@@ -1002,7 +1158,6 @@
             }
         }
 
-        // Refresh system status
         async function refreshStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -1018,7 +1173,6 @@
                     document.getElementById('lastAngle').textContent = '--°';
                 }
 
-                // Update auto measurement notice
                 if (status.autoMeasurementEnabled !== undefined) {
                     document.getElementById('autoMeasurementToggle').checked = status.autoMeasurementEnabled;
                     updateAutoMeasurementNotice(status.autoMeasurementEnabled);
@@ -1027,13 +1181,13 @@
                 if (status.hasScheduledMeasurement && status.nextMeasurementTime > 0) {
                     document.getElementById('nextMeasurement').textContent = formatDateTimeWithOffset(status.nextMeasurementTime);
                 } else {
-                    document.getElementById('nextMeasurement').textContent = 'No scheduled measurement';
+                    document.getElementById('nextMeasurement').textContent = 'No scheduled';
                 }
 
                 if (status.lastMeasurementTime > 0) {
                     document.getElementById('lastMeasurementTime').textContent = formatDateTimeWithOffset(status.lastMeasurementTime);
                 } else {
-                    document.getElementById('lastMeasurementTime').textContent = 'No previous measurement';
+                    document.getElementById('lastMeasurementTime').textContent = 'No previous';
                 }
 
                 const statusElement = document.getElementById('systemStatus');
@@ -1051,7 +1205,6 @@
             }
         }
 
-        // Start manual measurement
         async function startMeasurement() {
             try {
                 const response = await fetch('/api/measure', {
@@ -1072,7 +1225,6 @@
             }
         }
 
-        // Control relay
         async function controlRelay(action, state) {
             try {
                 const response = await fetch('/api/control', {
@@ -1097,7 +1249,6 @@
             }
         }
 
-        // Set date and time
         async function setDateTime() {
             const datetimeValue = document.getElementById('datetime').value;
             if (!datetimeValue) {
@@ -1106,7 +1257,7 @@
             }
 
             const localDate = new Date(datetimeValue);
-            
+
             const dateTime = {
                 year: localDate.getFullYear(),
                 month: localDate.getMonth() + 1,
@@ -1127,7 +1278,7 @@
 
                 if (response.ok) {
                     alert('Date and time set successfully!');
-                    addSerialMessage(`RTC time set to: ${localDate.toLocaleString()} (local time)`);
+                    addSerialMessage(`RTC time set to: ${localDate.toLocaleString()} (local)`);
                     refreshStatus();
                 } else {
                     alert('Error setting date and time');
@@ -1138,7 +1289,6 @@
             }
         }
 
-        // Download all measurement data
         async function downloadAllData() {
             try {
                 const response = await fetch('/api/data');
@@ -1154,24 +1304,23 @@
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
 
-                addSerialMessage('All measurement data downloaded');
+                addSerialMessage('All data downloaded');
             } catch (error) {
                 console.error('Error downloading data:', error);
                 alert('Error downloading data');
             }
         }
 
-        // Delete all measurement data
         async function deleteAllData() {
-            if (confirm('Are you sure you want to delete all measurement data? This cannot be undone.')) {
+            if (confirm('Delete all measurement data? This cannot be undone.')) {
                 try {
                     const response = await fetch('/api/data', {
                         method: 'DELETE'
                     });
 
                     if (response.ok) {
-                        alert('All measurement data deleted successfully!');
-                        addSerialMessage('All measurement data deleted');
+                        alert('All data deleted successfully!');
+                        addSerialMessage('All data deleted');
                         refreshFileList();
                     } else {
                         alert('Error deleting data');
@@ -1183,7 +1332,6 @@
             }
         }
 
-        // Set current date and time in form
         function setCurrentDateTime() {
             const now = new Date();
             const year = now.getFullYear();
@@ -1196,7 +1344,6 @@
             document.getElementById('datetime').value = datetimeString;
         }
 
-        // Cleanup intervals when page unloads
         window.addEventListener('beforeunload', function () {
             if (statusInterval) clearInterval(statusInterval);
             if (timeInterval) clearInterval(timeInterval);
